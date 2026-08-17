@@ -1,0 +1,16 @@
+[project]
+name = "musicgraph-backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "pedrotokar", email = "pedrotokar2004@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi[standard]>=0.141.1",
+    "neo4j>=6.2.0",
+]
+
+[project.scripts]
+musicgraph-backend = "musicgraph_backend:main"
