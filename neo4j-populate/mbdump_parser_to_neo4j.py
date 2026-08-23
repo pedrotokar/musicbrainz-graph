@@ -157,7 +157,7 @@ relationship_queries = {
         MATCH (a1:Artist {id: rel.artist_1_id})
         MATCH (a2:Artist {id: rel.artist_2_id})
         MERGE (a1)-[edge:IS_RELATED_TO]->(a2)
-        SET edge.subtypes = rel.subtypes
+        SET edge.subtypes = rel.subtypes, edge.start_date = rel.start_date, edge.end_date = rel.end_date
     """,
     "artist_recording_generic": """
         UNWIND $batch AS rel
@@ -385,11 +385,11 @@ with driver.session() as session:
     
     for index, dict_ in tqdm(iter_in_file("dumps/artist.tar.xz", "mbdump/artist"), total=2875751):
         artist_relationships = {
-            "artist": defaultdict(lambda: []),
-            "recording": defaultdict(lambda: []),
-            "release": defaultdict(lambda: []),
-            "releasegroup": defaultdict(lambda: []),
-            "work": defaultdict(lambda: []),
+            "artist": defaultdict(list),
+            "recording": defaultdict(list),
+            "release": defaultdict(list),
+            "releasegroup": defaultdict(list),
+            "work": defaultdict(list),
         }
         for relation in dict_.get("relations", []):
             target_type = relation.get("target-type")
