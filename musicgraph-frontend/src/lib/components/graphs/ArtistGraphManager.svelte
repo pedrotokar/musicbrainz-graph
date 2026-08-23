@@ -16,15 +16,19 @@
     //Graph data structure for now
     let nodes: GraphNode[] = $state([]);
     let edges: GraphEdge[] = $state([]);
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     let nodeMap: Map<string, GraphNode> = new Map;
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     let edgeMap: Map<string, GraphEdge> = new Map;
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     let nodeOwnershipMap: Map<string, Set<string>> = new Map;
+    // eslint-disable-next-line svelte/prefer-svelte-reactivity
     let edgeOwnershipMap: Map<string, Set<string>> = new Map;
-    $inspect("Loaded nodes and edges were updated: ", nodes, edges);
+    // $inspect("Loaded nodes and edges were updated: ", nodes, edges);
 
     //Interaction events (command-like pattern)
     let activeInteractions: GraphInteraction[] = $state([]);
-    $inspect("Active interactions: ", activeInteractions);
+    // $inspect("Active interactions: ", activeInteractions);
 
     let graphChangesCounter = $state(0);
 

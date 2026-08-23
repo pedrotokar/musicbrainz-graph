@@ -1,7 +1,4 @@
-//Type Imports
-import type { GenericAPIResponse, InteractionOwnedElements } from "$lib/types"
-
-//Module Imports
+import type { GenericAPIResponse, InteractionOwnedElements } from "$lib/types";
 import { getArtistAdjacentNodes } from '$lib/fetcher/api-fetcher';
 
 export abstract class GraphInteraction {
