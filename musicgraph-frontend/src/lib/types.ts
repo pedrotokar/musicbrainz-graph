@@ -19,10 +19,16 @@ export interface GraphEdge {
     parameters: Record<string, string>;
 }
 
-export interface ArtistAdjacentAPIResponse {
+export interface GenericAPIResponse {
     nodes: GraphNode[];
     edges: GraphEdge[];
 }
+
+export interface InteractionOwnedElements {
+    nodes: string[];
+    edges: string[];
+}
+
 
 //graph types used in graph rendering
 export interface SimulationNode extends GraphNode, SimulationNodeDatum {

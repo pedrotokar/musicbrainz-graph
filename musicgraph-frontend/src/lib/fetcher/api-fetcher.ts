@@ -1,9 +1,9 @@
-import type { ArtistAdjacentAPIResponse } from '$lib/types';
+import type { GenericAPIResponse } from '$lib/types';
 export const URL_API = "http://127.0.0.1:8000";
 
-export async function getArtistRelationships(artistId: string) {
+export async function getArtistAdjacentNodes(artistId: string) {
     const response = await fetch(`${URL_API}/artist/${artistId}/adjacent`);
-    const rawGraphData = await response.json() as ArtistAdjacentAPIResponse;
+    const rawGraphData = await response.json() as GenericAPIResponse;
     return rawGraphData;
 }
 //    return normalizeGraph(rawGraphData);
