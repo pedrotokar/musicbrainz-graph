@@ -1,6 +1,5 @@
 <script lang="ts">
     //TODO: lógica de evento existente ou não (dar um embed em um singleton?)
-    //TODO: lógica de remoção + componente (componente com  um switch case pra saber como desenha e o q lê dele)
     //TODO: o temido filtro...
 
     //Svelte imports
@@ -12,6 +11,7 @@
     //Modules Imports
     import {GraphInteraction, ExpandInteraction} from "$lib/interactions/abstractInteraction"
     import Graph from '$lib/components/graphs/Graph.svelte';
+	import InteractionList from "./filters/InteractionList.svelte";
 
     //Graph data structure for now
     let nodes: GraphNode[] = $state([]);
@@ -24,20 +24,14 @@
     let nodeOwnershipMap: Map<string, Set<string>> = new Map;
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     let edgeOwnershipMap: Map<string, Set<string>> = new Map;
-    // $inspect("Loaded nodes and edges were updated: ", nodes, edges);
+
 
     //Interaction events (command-like pattern)
     let activeInteractions: GraphInteraction[] = $state([]);
-    // $inspect("Active interactions: ", activeInteractions);
 
-    let graphChangesCounter = $state(0);
-
-    //TODO: make it generic to any interaction (maybe receive a interaction and the methods get a closure or smt)
-    async function expandGraph(artistId: string) {
+    function addInteraction(interaction: GraphInteraction){
         try {
-            const newInteraction: ExpandInteraction = await ExpandInteraction.create(artistId);
-//            const ownedElementsIds = newInteraction.getOwnedElementIds();
-            const graphData = newInteraction.getOwnedElements();
+            const graphData = interaction.getOwnedElements();
             
             for (const newNode of graphData["nodes"]){
                 if (!nodeMap.has(newNode.id)){
@@ -47,7 +41,7 @@
                 if (!nodeOwnershipMap.has(newNode.id)){
                     nodeOwnershipMap.set(newNode.id, new Set());
                 } 
-                nodeOwnershipMap.get(newNode.id)?.add(newInteraction.getId());
+                nodeOwnershipMap.get(newNode.id)?.add(interaction.getId());
             }
             for (const newEdge of graphData["edges"]){
                 const newEdgeId = newEdge.source + "->" + newEdge.target + "|" + newEdge.type
@@ -58,12 +52,68 @@
                 if (!edgeOwnershipMap.has(newEdgeId)){
                     edgeOwnershipMap.set(newEdgeId, new Set());
                 } 
-                edgeOwnershipMap.get(newEdgeId)?.add(newInteraction.getId());
+                edgeOwnershipMap.get(newEdgeId)?.add(interaction.getId());
             }
 
             graphChangesCounter += 1;
-            activeInteractions.push(newInteraction);
-        
+            activeInteractions.push(interaction);
+        } catch (e) {
+            console.error("Wasn't abble to add interaction", interaction, e);
+        } finally {
+            console.log("finished adding interaction", interaction);
+        }
+    }
+
+    function removeInteraction(interactionId: string){
+        const interaction = activeInteractions.find((interaction) => interaction.getId() == interactionId);
+        if (interaction){
+            try {
+                
+                const ownedElements = interaction.getOwnedElementIds();
+
+                for(const ownedNodeId of ownedElements["nodes"]){
+                    nodeOwnershipMap.get(ownedNodeId)?.delete(interactionId);
+                    
+                    if (nodeOwnershipMap.get(ownedNodeId)?.size === 0){
+                        nodeOwnershipMap.delete(ownedNodeId);
+                        nodeMap.delete(ownedNodeId);
+                        const index = nodes.findIndex(n => n.id === ownedNodeId);
+                        if (index !== -1) nodes.splice(index, 1);
+                    }
+                }
+
+                for(const ownedEdgeId of ownedElements["edges"]){
+                    edgeOwnershipMap.get(ownedEdgeId)?.delete(interactionId);
+                    
+                    if (edgeOwnershipMap.get(ownedEdgeId)?.size === 0){
+                        edgeOwnershipMap.delete(ownedEdgeId);
+                        edgeMap.delete(ownedEdgeId);
+                        const index = edges.findIndex(e => (e.source + "->" + e.target + "|" + e.type) === ownedEdgeId);
+                        if (index !== -1) edges.splice(index, 1);
+                    }
+                }
+
+                graphChangesCounter += 1;
+                const index = activeInteractions.findIndex((interaction) => interaction.getId() == interactionId);
+                if (index !== -1) activeInteractions.splice(index, 1);
+
+            } catch (e) {
+                console.error("Wasn't abble to remove interaction", interaction, e);
+            } finally {
+                console.log("finished removing interaction", interaction);
+            }
+        } else {
+            console.log(`Interaction ${interactionId} wasn't present in active interactions`);
+        }
+    }
+
+    let graphChangesCounter = $state(0);
+
+    //TODO: improve this, decide where the logic goes
+    async function expandArtist(artistId: string) {
+        try {
+            const newInteraction = await ExpandInteraction.create(artistId);
+            addInteraction(newInteraction);
         } catch (e) {
             console.error(e);
         } finally {
@@ -73,18 +123,23 @@
 
 
     onMount(() => {
-        expandGraph("eeb1195b-f213-4ce1-b28c-8565211f8e43").then(() => {}).catch((error) => {console.error(error);});
-        setTimeout(() => {expandGraph("d8433dee-d1a8-4b40-b27c-40bc53481167").then(() => {}); }, 5000);
-        setTimeout(() => {expandGraph("dc5caa1a-2be6-4104-a34e-fab24dcd4abe").then(() => {}); }, 10000);
-        setTimeout(() => {expandGraph("d338e1b0-1f9c-4a4a-9c74-e2ffa4de79b2").then(() => {}); }, 15000);
-        setTimeout(() => {expandGraph("21176a1c-bdbf-43d0-aaae-5f2df97b09bd").then(() => {}); }, 20000);
-        setTimeout(() => {expandGraph("3a528006-1429-47f4-ae9b-2ea95343e16a").then(() => {}); }, 25000);
-        
+        expandArtist("eeb1195b-f213-4ce1-b28c-8565211f8e43").then(() => {}).catch((error) => {console.error(error);});
+        setTimeout(() => {expandArtist("d8433dee-d1a8-4b40-b27c-40bc53481167").then(() => {}).catch((error) => {console.error(error);}); }, 5000);
+        setTimeout(() => {expandArtist("dc5caa1a-2be6-4104-a34e-fab24dcd4abe").then(() => {}).catch((error) => {console.error(error);}); }, 10000);
+        setTimeout(() => {expandArtist("d338e1b0-1f9c-4a4a-9c74-e2ffa4de79b2").then(() => {}).catch((error) => {console.error(error);}); }, 15000);
+        setTimeout(() => {expandArtist("21176a1c-bdbf-43d0-aaae-5f2df97b09bd").then(() => {}).catch((error) => {console.error(error);}); }, 20000);
+        setTimeout(() => {expandArtist("3a528006-1429-47f4-ae9b-2ea95343e16a").then(() => {}).catch((error) => {console.error(error);}); }, 25000);
     })
+    
+    // $inspect("Active interactions: ", activeInteractions);
+    // $inspect("Loaded nodes and edges were updated: ", nodes, edges);
+    // $inspect("graphChangesCounter", graphChangesCounter);
 
 </script>
 
-<Graph nodes={nodes} edges={edges} graphChangesCounter={graphChangesCounter} onClickCallbackFunction={expandGraph}/>
+<Graph nodes={nodes} edges={edges} graphChangesCounter={graphChangesCounter} onClickCallbackFunction={expandArtist}/>
+
+<InteractionList activeInteractions={activeInteractions} removeInteractionCallback={removeInteraction}/>
 
 {#each nodes as node (node.id)}    
 <p>

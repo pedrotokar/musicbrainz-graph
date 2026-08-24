@@ -85,13 +85,12 @@
     // ------------------ Implementing interaction features ------------------
     
     // Used to implement the click feature.
-    function onNodeClick(node: SimulationNode){
-        onClickCallbackFunction(node.id);
+    async function onNodeClick(node: SimulationNode){
+        await onClickCallbackFunction(node.id);
     }
 
     // Used to implement the drag feature. D3 only helps handling the physics 
     // and not the screen writing.
-    
     function draggable(node: SimulationNode){
         return (nodeElement: SVGElement) => {
 

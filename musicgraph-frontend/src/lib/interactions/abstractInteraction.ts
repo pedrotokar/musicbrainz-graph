@@ -30,6 +30,8 @@ export abstract class GraphInteraction {
         }
         return owned
     }
+
+    abstract getText(): string;
 }
 
 export class ExpandInteraction extends GraphInteraction {
@@ -43,5 +45,9 @@ export class ExpandInteraction extends GraphInteraction {
     static async create(originNodeId: string){
         const graphData = await getArtistAdjacentNodes(originNodeId);
         return new ExpandInteraction(graphData, originNodeId);
+    }
+
+    getText() {
+        return this.originNodeId;
     }
 }
