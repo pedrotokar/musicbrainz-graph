@@ -2,7 +2,7 @@
     //TODO: Make that component deal with other future interactions
     //TODO: style it correctly
     import close from '$lib/assets/close.svg';
-    let { activeInteractions, removeInteractionCallback } = $props();
+    let { activeInteractions, removeInteractionCallback, selectInteractionCallback } = $props();
 </script>
 
 <div class="container">
@@ -10,13 +10,11 @@
 	<div id="artist-container">
 		{#each activeInteractions as interaction, index (interaction.getId())}
 			<div
-				class="expand-interaction-wrapper"
+				class="expand-interaction-wrapper" role="button" tabindex="0"
 				// class:selected={selectedNode
 				// 	? node.id === selectedNode.id
 				// 	: false}
-				// on:click={(e) => {
-				// 	selectedNode = node;
-				// }}
+				onclick={() => selectInteractionCallback(interaction)} onkeydown={() => console.log("hi")}
 			>
 				<div class="expand-interaction-text" class:hid={index > 4}>
 					{interaction.getShowText()}

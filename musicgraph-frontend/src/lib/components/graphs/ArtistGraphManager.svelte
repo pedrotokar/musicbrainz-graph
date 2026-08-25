@@ -6,12 +6,14 @@
     import { onMount } from "svelte";
 
     //Type Imports
-    import type { GraphNode, GraphEdge } from "$lib/types"
+    import type { GraphNode, GraphEdge, FilterState } from "$lib/types"
 
     //Modules Imports
     import {GraphInteraction, ExpandInteraction} from "$lib/interactions/abstractInteraction"
+    import { relationshipData } from "./relationships";
     import Graph from '$lib/components/graphs/Graph.svelte';
 	import InteractionList from "./filters/InteractionList.svelte";
+    import RelationshipFilter from "./filters/RelationshipFilter.svelte";
 
     //Graph data structure for now
     let nodes: GraphNode[] = $state([]);
@@ -109,8 +111,37 @@
         }
     }
 
+    //TODO: CHANGE THAT (MAYBE TO WORK WITH THE SINGLETON)
+    function selectInteraction(interaction: GraphInteraction){
+        selectedInteraction = interaction;
+    }
 
+    //Filter state
+    let activeFilters: FilterState = $state(initiateFilterState());
+    
+    function initiateFilterState(){
+        const initialState: FilterState = {};
+        for (const [key, config] of Object.entries(relationshipData)) {
+            if (config.bidirectional) {
+                initialState[key] = { bidirectional: true, show: true };
+            } else {
+                initialState[key] = { bidirectional: false, showForward: true, showBackward: true };
+            }
+        }
+        return initialState;
+    };
 
+    /*function blah blah {
+        => edgemask = [] - ou um map
+        nodemask = [] - ou um map
+        for each aresta:
+        aresta.show = any(interaction.neverhide(aresta)) OR aresta.type.show (ou é segurada ou não tá filtrada, esse type eu sei a direção via os eventos que fizeram ela surgir)
+        se aresta show: coloca contador de arestas visiveis pro nó
+        for each node:
+        node.show = nodemaskcounter != 0 OR any(interaction.neverhide(node))
+        daí passa as coisas com as masks
+    }*/
+    
     //TODO: improve this, decide where the logic goes
     async function expandArtist(artistId: string) {
         try {
@@ -133,11 +164,13 @@
         setTimeout(() => {expandArtist("21176a1c-bdbf-43d0-aaae-5f2df97b09bd").then(() => {}).catch((error) => {console.error(error);}); }, 20000);
         setTimeout(() => {expandArtist("3a528006-1429-47f4-ae9b-2ea95343e16a").then(() => {}).catch((error) => {console.error(error);}); }, 25000);
         setTimeout(() => {expandArtist("b51c672b-85e0-48fe-8648-470a2422229f").then(() => {}).catch((error) => {console.error(error);}); }, 30000);
+        setTimeout(() => {expandArtist("ba550d0e-adac-4864-b88b-407cab5e76af").then(() => {}).catch((error) => {console.error(error);}); }, 35000);
     })
     
     // $inspect("Active interactions: ", activeInteractions);
     // $inspect("Loaded nodes and edges were updated: ", nodes, edges);
     // $inspect("graphChangesCounter", graphChangesCounter);
+    $inspect("Active filters", activeFilters);
 
     
 
@@ -147,7 +180,9 @@
 
 <Graph nodes={nodes} edges={edges} graphChangesCounter={graphChangesCounter} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction}/>
 
-<InteractionList activeInteractions={activeInteractions} removeInteractionCallback={removeInteraction}/>
+<RelationshipFilter/>
+
+<InteractionList activeInteractions={activeInteractions} removeInteractionCallback={removeInteraction} selectInteractionCallback={selectInteraction}/>
 
 {#each nodes as node (node.id)}    
 <p>

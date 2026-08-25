@@ -61,3 +61,8 @@ export type RelationshipConfig =
     | { bidirectional: false; forward: RelationshipDictionary; backward: RelationshipDictionary };
 
 export type RelationshipRegistry = Record<string, RelationshipConfig>;
+
+export type FilterState = Record<string, 
+    | { bidirectional: true; show: boolean }
+    | { bidirectional: false; showForward: boolean; showBackward: boolean }
+>;
