@@ -27,16 +27,19 @@
     */
 
     //TODO: Improve clicking by having a loading state and by doing some other things idk
+    //TODO: Improve node coloring and context handling in general (registry is a good option!)
 
     //Svelte and D3 imports
     import { onMount, untrack } from "svelte";
     import * as d3 from "d3";
-    import type { D3ZoomEvent, ZoomBehavior, D3DragEvent, DragBehavior } from "d3";
 
     //Type imports
-    import type { GraphNode, GraphEdge, SimulationNode, SimulationEdge } from "$lib/types";
+    import type { D3ZoomEvent, ZoomBehavior, D3DragEvent, DragBehavior } from "d3";
+    import type { GraphNode, GraphEdge, SimulationNode, SimulationEdge, NodeContext } from "$lib/types";
 
-    let { nodes, edges, graphChangesCounter, onClickCallbackFunction } = $props();
+    import { relationshipData } from "$lib/components/graphs/relationships";
+
+    let { nodes, edges, graphChangesCounter, onClickCallbackFunction, selectedInteraction } = $props();
 
     let simulationNodes: SimulationNode[] = $state([])
     let simulationEdges: SimulationEdge[] = $state([])
@@ -130,6 +133,37 @@
 
     let zoomBehavior: ZoomBehavior<SVGSVGElement, unknown> = d3.zoom<SVGSVGElement, unknown>().on("zoom", onZoom);
 
+    //Used to implement the node coloring feature
+    function getColorFromContext(context: NodeContext) {
+        if (context.isOrigin) return "#3b82f6";
+        if (!context.isRelated) return "#4b5563"; 
+        
+        if (context.relationshipType && context.relationshipDirection){
+            const relationshipDict = relationshipData[context.relationshipType || "DEFAULT"] || relationshipData["DEFAULT"];
+            if (!relationshipDict.bidirectional) {
+                return relationshipDict[context.relationshipDirection].color
+            } else {
+                return relationshipDict.color;
+            }
+        } else {
+            return "#000000"
+        }
+    }
+
+    // function getTooltipFromContext(context: NodeContext) {
+    //     return "Olá!";
+    // }
+
+    function getNodeColor(node: SimulationNode) {
+        const nodeContext = selectedInteraction.getNodeContext(node.id);
+        return getColorFromContext(nodeContext);
+    }
+
+    // function getNodeTooltip(node: SimulationNode) {
+    //     const nodeContext = selectedInteraction.getNodeContext(node.id);
+    //     return getTooltipFromContext(nodeContext);
+    // }
+
     // ------------------ Implementing simulation management ------------------
     let simulation: d3.Simulation<SimulationNode, SimulationEdge>;
 
@@ -185,7 +219,7 @@
 
 </script>
 
-<h1>O grafo vai entrar aqui em algum momento com uma tag canvas I guess (na real era svg)</h1>
+<!-- <h1>O grafo vai entrar aqui em algum momento com uma tag canvas I guess (na real era svg)</h1> -->
 
 <svg id="ArtistGraphSVG"
      width="{width}" height="{height}"
@@ -208,7 +242,8 @@
                onclick={() => onNodeClick(node)} onkeydown={() => onNodeClick(node)} 
                role="button" tabindex="0"
                >
-                <circle r="20" fill="blue"/>
+                <!-- <circle r="20" fill="blue"/> -->
+                <circle r="20" fill={getNodeColor(node)}/>
                 <text dy="0.35em" text-anchor="middle" dominant-baseline="middle" font-size="10px">{node.display_name}</text> 
             </g>
         {/each}

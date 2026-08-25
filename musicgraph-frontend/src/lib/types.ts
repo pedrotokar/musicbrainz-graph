@@ -40,3 +40,24 @@ export interface SimulationEdge extends SimulationLinkDatum<SimulationNode> {
     type: string;
     parameters: Record<string, string>;
 }
+
+//Node context returned by interactions
+export interface NodeContext {
+    isOrigin: boolean;
+    isRelated: boolean;
+    relationshipType?: string; 
+    relationshipDirection?: "forward" | "backward";
+    relationshipMetadata?: Record<string, string>; 
+}
+
+export interface RelationshipDictionary {
+    color: string;
+    displayName: string;
+}
+
+//Relationship registry type
+export type RelationshipConfig = 
+    | ({ bidirectional: true } & RelationshipDictionary)
+    | { bidirectional: false; forward: RelationshipDictionary; backward: RelationshipDictionary };
+
+export type RelationshipRegistry = Record<string, RelationshipConfig>;

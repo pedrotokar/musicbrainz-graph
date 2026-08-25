@@ -1,6 +1,6 @@
 <script lang="ts">
-    //TODO: Fazer esse componente lidar bem com a futura interação dijkstra
-    //TODO: Estilizar corretamente
+    //TODO: Make that component deal with other future interactions
+    //TODO: style it correctly
     import close from '$lib/assets/close.svg';
     let { activeInteractions, removeInteractionCallback } = $props();
 </script>
@@ -19,7 +19,7 @@
 				// }}
 			>
 				<div class="expand-interaction-text" class:hid={index > 4}>
-					{interaction.getText()}
+					{interaction.getShowText()}
 				</div>
 				<div class="remove-button" class:hid={index > 4}>
 					<button onclick={() => removeInteractionCallback(interaction.getId())}>
