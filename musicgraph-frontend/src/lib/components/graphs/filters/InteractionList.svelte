@@ -1,8 +1,15 @@
 <script lang="ts">
-    //TODO: Make that component deal with other future interactions
     //TODO: style it correctly
-    import close from '$lib/assets/close.svg';
-    let { activeInteractions, removeInteractionCallback, selectInteractionCallback } = $props();
+    import { GraphInteraction } from '$lib/interactions/abstractInteraction';
+	
+	import close from '$lib/assets/close.svg';
+
+	interface Props {
+        activeInteractions: GraphInteraction[];
+        removeInteractionCallback: (id: string | number) => void;
+        selectInteractionCallback: (interaction: GraphInteraction) => void;
+    }
+    let { activeInteractions, removeInteractionCallback, selectInteractionCallback }: Props = $props();
 </script>
 
 <div class="container">

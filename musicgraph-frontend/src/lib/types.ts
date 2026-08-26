@@ -1,4 +1,3 @@
-//TODO: Type everything
 //TODO: Change any type to union of known possible types (dates, numbers, strings, ?)
 
 import type { SimulationNodeDatum, SimulationLinkDatum} from 'd3';

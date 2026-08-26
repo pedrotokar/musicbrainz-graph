@@ -1,6 +1,6 @@
 <script lang="ts">
-    //TODO: figure out how to make API errors break the site
-    //TODO: add relationship filter...
+    //TODO: figure out how to sinalize that an API Error occured
+    //TODO: put relationship filter in the right places
 
     //Svelte imports
     import { onMount } from "svelte";
@@ -69,7 +69,6 @@
                 }
             }
             
-            applyFilter()
             graphChangesCounter += 1;
             activeInteractions.push(interaction);
         } catch (e) {
@@ -108,7 +107,6 @@
                     }
                 }
 
-                applyFilter()
                 graphChangesCounter += 1;
                 const index = activeInteractions.findIndex((interaction) => interaction.getId() == interactionId);
                 if (index !== -1) activeInteractions.splice(index, 1);
@@ -206,6 +204,7 @@
             const newInteraction = await ExpandInteraction.create(artistId);
             selectedInteraction = newInteraction;
             if (!activeInteractions.some((interaction) => interaction.getId() == newInteraction.getId())) addInteraction(newInteraction);
+            applyFilter();
         } catch (e) {
             console.error(e);
         } finally {
