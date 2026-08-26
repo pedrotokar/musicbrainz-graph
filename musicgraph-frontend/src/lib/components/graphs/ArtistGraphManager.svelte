@@ -15,8 +15,8 @@
 
     //Component Imports
     import Graph from '$lib/components/graphs/Graph.svelte';
-	import InteractionList from "./filters/InteractionList.svelte";
-    import RelationshipFilter from "./filters/RelationshipFilter.svelte";
+	import InteractionList from "../filters/InteractionList.svelte";
+    import RelationshipFilter from "../filters/RelationshipFilter.svelte";
 
 
     //Graph data structure for now
