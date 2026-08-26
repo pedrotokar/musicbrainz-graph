@@ -1,5 +1,5 @@
 <script lang="ts">
-    //TODO: do some logic to prevent duplicated event (maybe singleton logic embeded someway in the class)
+    //TODO: figure out how to make API errors break the site
     //TODO: add relationship filter...
 
     //Svelte imports
@@ -9,11 +9,15 @@
     import type { GraphNode, GraphEdge, FilterState } from "$lib/types"
 
     //Modules Imports
-    import {GraphInteraction, ExpandInteraction} from "$lib/interactions/abstractInteraction"
+    import { GraphInteraction } from "$lib/interactions/abstractInteraction"
+    import { ExpandInteraction } from "$lib/interactions/expandInteraction";
     import { relationshipData } from "./relationships";
+
+    //Component Imports
     import Graph from '$lib/components/graphs/Graph.svelte';
 	import InteractionList from "./filters/InteractionList.svelte";
     import RelationshipFilter from "./filters/RelationshipFilter.svelte";
+
 
     //Graph data structure for now
     let nodes: GraphNode[] = $state([]);
@@ -25,11 +29,12 @@
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     let nodeOwnershipMap: Map<string, Set<string>> = new Map;
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    let edgeOwnershipMap: Map<string, Set<string>> = new Map;
+    let edgeOwnershipMap: Map<string, Map<string, string>> = new Map;
     
     let graphChangesCounter = $state(0);
 
     //Interaction events (command-like pattern)
+    // ------------------ Implementing interaction handling ------------------
     let activeInteractions: GraphInteraction[] = $state([]);
     let selectedInteraction: GraphInteraction | undefined = $state();
 
@@ -48,17 +53,23 @@
                 nodeOwnershipMap.get(newNode.id)?.add(interaction.getId());
             }
             for (const newEdge of graphData["edges"]){
-                const newEdgeId = newEdge.source + "->" + newEdge.target + "|" + newEdge.type
-                if (!edgeMap.has(newEdgeId)){
-                    edges.push(newEdge);
-                    edgeMap.set(newEdgeId, newEdge)
+                const relativeDirection = interaction.getEdgeContext(newEdge);
+                if(relativeDirection){
+                    const newEdgeId = newEdge.source + "->" + newEdge.target + "|" + newEdge.type
+                    if (!edgeMap.has(newEdgeId)){
+                        edges.push(newEdge);
+                        edgeMap.set(newEdgeId, newEdge)
+                    }
+                    if (!edgeOwnershipMap.has(newEdgeId)){
+                        edgeOwnershipMap.set(newEdgeId, new Map());
+                    } 
+                    edgeOwnershipMap.get(newEdgeId)?.set(interaction.getId(), relativeDirection);
+                } else {
+                    continue;
                 }
-                if (!edgeOwnershipMap.has(newEdgeId)){
-                    edgeOwnershipMap.set(newEdgeId, new Set());
-                } 
-                edgeOwnershipMap.get(newEdgeId)?.add(interaction.getId());
             }
-
+            
+            applyFilter()
             graphChangesCounter += 1;
             activeInteractions.push(interaction);
         } catch (e) {
@@ -97,6 +108,7 @@
                     }
                 }
 
+                applyFilter()
                 graphChangesCounter += 1;
                 const index = activeInteractions.findIndex((interaction) => interaction.getId() == interactionId);
                 if (index !== -1) activeInteractions.splice(index, 1);
@@ -118,6 +130,8 @@
 
     //Filter state
     let activeFilters: FilterState = $state(initiateFilterState());
+    let filteredNodes: GraphNode[] = $state([]);
+    let filteredEdges: GraphEdge[] = $state([]);
     
     function initiateFilterState(){
         const initialState: FilterState = {};
@@ -130,6 +144,50 @@
         }
         return initialState;
     };
+
+
+    //TODO: MAKE THAT LOGIC ACTUALLY GOOD (delimit when will filters be called, how svelte reactivity should be used and how data flows between the components)
+    function applyFilter(){
+        const edgeMask: Map<string, boolean> = new Map();
+        const nodeMask: Map<string, number> = new Map();
+        for (const edge of edges) {
+            edgeMask.set(edge.source + "->" + edge.target + "|" + edge.type, Array.from(edgeOwnershipMap.get(edge.source + "->" + edge.target + "|" + edge.type), ([interactionId, direction]) => {
+                const interaction = activeInteractions.find((i) => i.getId() == interactionId);
+                const interactionLock = interaction?.shouldAlwaysShowEdge(edge);
+                let filtered;
+                const filter = activeFilters[edge.type || "DEFAULT"]
+                if (filter.bidirectional){
+                    filtered = filter.show
+                } else {
+                    if (direction == "forward") filtered = filter.showForward;
+                    else if (direction == "backward") filtered = filter.showBackward;
+                }
+                return filtered || interactionLock
+            } ).some(Boolean))
+        }
+        console.log(edgeMask);
+        
+
+        filteredEdges = edges.filter((edge) => {
+            return edgeMask.get(edge.source + "->" + edge.target + "|" + edge.type);
+        })
+
+        filteredEdges.forEach((edge, i, arr) => {
+            nodeMask.set(edge.source, (nodeMask.get(edge.source) || 0) + 1);
+            nodeMask.set(edge.target, (nodeMask.get(edge.target) || 0) + 1);
+        })
+        filteredNodes = nodes.filter((node) => {
+            const visibleEdges = nodeMask.get(node.id) > 0;
+            const interacionLock = Array.from(nodeOwnershipMap.get(node.id), (interactionId) => {
+                const interaction = activeInteractions.find((i) => i.getId() == interactionId);
+                const interactionLock = interaction?.shouldAlwaysShowNode(node);
+                return interactionLock
+            } ).some(Boolean)
+            console.log(visibleEdges, interacionLock);
+            return visibleEdges || interacionLock;
+        });
+        console.log("filtered nodes lenght", filteredNodes.length, "filtered edges lenght", filteredEdges.length);
+    }
 
     /*function blah blah {
         => edgemask = [] - ou um map
@@ -147,7 +205,7 @@
         try {
             const newInteraction = await ExpandInteraction.create(artistId);
             selectedInteraction = newInteraction;
-            addInteraction(newInteraction);
+            if (!activeInteractions.some((interaction) => interaction.getId() == newInteraction.getId())) addInteraction(newInteraction);
         } catch (e) {
             console.error(e);
         } finally {
@@ -157,20 +215,20 @@
 
 
     onMount(() => {
-        expandArtist("eeb1195b-f213-4ce1-b28c-8565211f8e43").then(() => {}).catch((error) => {console.error(error);});;
-        setTimeout(() => {expandArtist("d8433dee-d1a8-4b40-b27c-40bc53481167").then(() => {}).catch((error) => {console.error(error);}); }, 5000);
-        setTimeout(() => {expandArtist("dc5caa1a-2be6-4104-a34e-fab24dcd4abe").then(() => {}).catch((error) => {console.error(error);}); }, 10000);
-        setTimeout(() => {expandArtist("d338e1b0-1f9c-4a4a-9c74-e2ffa4de79b2").then(() => {}).catch((error) => {console.error(error);}); }, 15000);
-        setTimeout(() => {expandArtist("21176a1c-bdbf-43d0-aaae-5f2df97b09bd").then(() => {}).catch((error) => {console.error(error);}); }, 20000);
-        setTimeout(() => {expandArtist("3a528006-1429-47f4-ae9b-2ea95343e16a").then(() => {}).catch((error) => {console.error(error);}); }, 25000);
+        expandArtist("eeb1195b-f213-4ce1-b28c-8565211f8e43").then(() => {}).catch((error) => {console.error(error);});
+        // setTimeout(() => {expandArtist("d8433dee-d1a8-4b40-b27c-40bc53481167").then(() => {}).catch((error) => {console.error(error);}); }, 5000);
+        // setTimeout(() => {expandArtist("dc5caa1a-2be6-4104-a34e-fab24dcd4abe").then(() => {}).catch((error) => {console.error(error);}); }, 10000);
+        // setTimeout(() => {expandArtist("d338e1b0-1f9c-4a4a-9c74-e2ffa4de79b2").then(() => {}).catch((error) => {console.error(error);}); }, 15000);
+        // setTimeout(() => {expandArtist("21176a1c-bdbf-43d0-aaae-5f2df97b09bd").then(() => {}).catch((error) => {console.error(error);}); }, 20000);
+        // setTimeout(() => {expandArtist("3a528006-1429-47f4-ae9b-2ea95343e16a").then(() => {}).catch((error) => {console.error(error);}); }, 25000);
         setTimeout(() => {expandArtist("b51c672b-85e0-48fe-8648-470a2422229f").then(() => {}).catch((error) => {console.error(error);}); }, 30000);
-        setTimeout(() => {expandArtist("ba550d0e-adac-4864-b88b-407cab5e76af").then(() => {}).catch((error) => {console.error(error);}); }, 35000);
+        // setTimeout(() => {expandArtist("ba550d0e-adac-4864-b88b-407cab5e76af").then(() => {}).catch((error) => {console.error(error);}); }, 35000);
     })
     
     // $inspect("Active interactions: ", activeInteractions);
     // $inspect("Loaded nodes and edges were updated: ", nodes, edges);
     // $inspect("graphChangesCounter", graphChangesCounter);
-    $inspect("Active filters", activeFilters);
+    // $inspect("Active filters", activeFilters);
 
     
 
@@ -178,9 +236,10 @@
 
 
 
-<Graph nodes={nodes} edges={edges} graphChangesCounter={graphChangesCounter} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction}/>
+<!-- <Graph nodes={nodes} edges={edges} graphChangesCounter={graphChangesCounter} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction}/> -->
+<Graph nodes={filteredNodes} edges={filteredEdges} graphChangesCounter={graphChangesCounter} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction}/>
 
-<RelationshipFilter/>
+<RelationshipFilter activeFilters={activeFilters}/>
 
 <InteractionList activeInteractions={activeInteractions} removeInteractionCallback={removeInteraction} selectInteractionCallback={selectInteraction}/>
 

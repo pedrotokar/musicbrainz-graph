@@ -30,9 +30,8 @@ export interface InteractionOwnedElements {
 }
 
 
-//graph types used in graph rendering
-export interface SimulationNode extends GraphNode, SimulationNodeDatum {
-}
+//Graph types used in graph rendering
+export interface SimulationNode extends GraphNode, SimulationNodeDatum {}
 
 export interface SimulationEdge extends SimulationLinkDatum<SimulationNode> {
     source: SimulationNode;
@@ -50,12 +49,16 @@ export interface NodeContext {
     relationshipMetadata?: Record<string, string>; 
 }
 
+export type EdgeContext = "forward" | "backward" | "bidirectional" | undefined;
+
+
+//Relationship management utility types
 export interface RelationshipDictionary {
     color: string;
     displayName: string;
 }
 
-//Relationship registry type
+
 export type RelationshipConfig = 
     | ({ bidirectional: true } & RelationshipDictionary)
     | { bidirectional: false; forward: RelationshipDictionary; backward: RelationshipDictionary };
