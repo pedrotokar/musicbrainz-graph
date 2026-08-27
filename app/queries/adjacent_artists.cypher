@@ -37,7 +37,7 @@ CALL (id) {
     MATCH (sourceArtist)-[relationship:IS_RELATED_TO]-(artist:Artist)
     WITH sourceArtist, relationship, artist, 
         CASE
-            WHEN any(subtype IN relationship.subtypes WHERE subtype in ["member of band", "subgroup", "artist rename", "artistic director", "conductor position", "founder", "supporting musician", "vocal supporting musician", "instrumental supporting musician", "tribute", "voice actor", "is person", "teacher", "artist-in-residence", "composer-in-residence"])
+            WHEN any(subtype IN relationship.subtypes WHERE subtype in ["member of band", "subgroup", "artist rename", "artistic director", "conductor position", "founder", "supporting musician", "vocal supporting musician", "instrumental supporting musician", "voice actor", "is person", "teacher", "artist-in-residence", "composer-in-residence"])
             THEN {type: "HAS_MUSICAL_CONNECTION_TO", attributes: {subtypes: relationship.subtypes}}
 
             WHEN any(subtype IN relationship.subtypes WHERE subtype in ["parent", "sibling", "married", "involved with", "named after artist"])
@@ -45,6 +45,9 @@ CALL (id) {
 
             WHEN any(subtype IN relationship.subtypes WHERE subtype in ["collaboration"])
             THEN {type: "COLLABORATED_WITH", attributes: {collaboration_recordings: NULL}}
+
+            WHEN any(subtype IN relationship.subtypes WHERE subtype in ["tribute"])
+            THEN {type: "COVERED", attributes: {covered_songs: NULL, is_tribute_band: TRUE}}
         END as vRelationshipData
     WHERE vRelationshipData IS NOT NULL
     CALL apoc.create.vRelationship(startNode(relationship), vRelationshipData.type, vRelationshipData.attributes, endNode(relationship)) YIELD rel AS vRelationship
