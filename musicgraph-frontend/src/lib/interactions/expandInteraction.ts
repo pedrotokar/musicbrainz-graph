@@ -50,8 +50,8 @@ export class ExpandInteraction extends GraphInteraction {
         return this.originNodeName;
     }
 
-    getNodeContext(nodeId: string): NodeContext {
-        if (nodeId === this.originNodeId) {
+    getNodeContext(node: GraphNode): NodeContext {
+        if (node.id === this.originNodeId) {
             return { 
                 isOrigin: true, 
                 isRelated: false 
@@ -60,8 +60,8 @@ export class ExpandInteraction extends GraphInteraction {
         
         //TODO: handle multi edge
         const edge = this.interactionAPIResponse["edges"].find(edge => 
-            (edge.source === this.originNodeId && edge.target === nodeId) ||
-            (edge.target === this.originNodeId && edge.source === nodeId)
+            (edge.source === this.originNodeId && edge.target === node.id) ||
+            (edge.target === this.originNodeId && edge.source === node.id)
         );
 
         if (edge) {

@@ -1,12 +1,14 @@
 <script lang="ts">
     //TODO: figure out how to sinalize that an API Error occured
     //TODO: put relationship filter in the right places
+    //TODO: fix all the places where I use an edge ID
+    //TODO: Change interactionregistry from array to map
 
     //Svelte imports
     import { onMount } from "svelte";
 
     //Type Imports
-    import type { GraphNode, GraphEdge, FilterState } from "$lib/types"
+    import type { GraphNode, GraphEdge, FilterState, EdgeContext } from "$lib/types"
 
     //Modules Imports
     import { GraphInteraction } from "$lib/interactions/abstractInteraction"
@@ -29,12 +31,13 @@
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
     let nodeOwnershipMap: Map<string, Set<string>> = new Map;
     // eslint-disable-next-line svelte/prefer-svelte-reactivity
-    let edgeOwnershipMap: Map<string, Map<string, string>> = new Map;
+    let edgeOwnershipMap: Map<string, Map<string, EdgeContext>> = new Map;
     
-    let graphChangesCounter = $state(0);
+    // let graphChangesCounter = $state(0);
 
-    //Interaction events (command-like pattern)
+    
     // ------------------ Implementing interaction handling ------------------
+    //                         (command-like pattern)
     let activeInteractions: GraphInteraction[] = $state([]);
     let selectedInteraction: GraphInteraction | undefined = $state();
 
@@ -69,7 +72,7 @@
                 }
             }
             
-            graphChangesCounter += 1;
+            // graphChangesCounter += 1;
             activeInteractions.push(interaction);
         } catch (e) {
             console.error("Wasn't abble to add interaction", interaction, e);
@@ -107,7 +110,7 @@
                     }
                 }
 
-                graphChangesCounter += 1;
+                // graphChangesCounter += 1;
                 const index = activeInteractions.findIndex((interaction) => interaction.getId() == interactionId);
                 if (index !== -1) activeInteractions.splice(index, 1);
 
@@ -121,16 +124,29 @@
         }
     }
 
-    //TODO: CHANGE THAT (MAYBE TO WORK WITH THE SINGLETON)
     function selectInteraction(interaction: GraphInteraction){
         selectedInteraction = interaction;
     }
 
+    //TODO: improve this, decide where the logic goes
+    async function expandArtist(artistId: string) {
+        try {
+            const newInteraction = await ExpandInteraction.create(artistId);
+            selectedInteraction = newInteraction;
+            if (!activeInteractions.some((interaction) => interaction.getId() == newInteraction.getId())) addInteraction(newInteraction);
+            // applyFilter();
+        } catch (e) {
+            console.error(e);
+        } finally {
+            console.log("finished expanding");
+        }
+    }
+
+    // ------------------ Implementing filtering handling ------------------
+
     //Filter state
     let activeFilters: FilterState = $state(initiateFilterState());
-    let filteredNodes: GraphNode[] = $state([]);
-    let filteredEdges: GraphEdge[] = $state([]);
-    
+
     function initiateFilterState(){
         const initialState: FilterState = {};
         for (const [key, config] of Object.entries(relationshipData)) {
@@ -143,74 +159,114 @@
         return initialState;
     };
 
+    function auxGetEdgeVisibility(edge: GraphEdge, interactionId: string, direction: EdgeContext){
+        const interaction = activeInteractions.find(
+            (interaction) => interaction.getId() == interactionId
+        );
+        const interactionLock = interaction?.shouldAlwaysShowEdge(edge);
 
-    //TODO: MAKE THAT LOGIC ACTUALLY GOOD (delimit when will filters be called, how svelte reactivity should be used and how data flows between the components)
-    function applyFilter(){
-        const edgeMask: Map<string, boolean> = new Map();
-        const nodeMask: Map<string, number> = new Map();
-        for (const edge of edges) {
-            edgeMask.set(edge.source + "->" + edge.target + "|" + edge.type, Array.from(edgeOwnershipMap.get(edge.source + "->" + edge.target + "|" + edge.type), ([interactionId, direction]) => {
-                const interaction = activeInteractions.find((i) => i.getId() == interactionId);
-                const interactionLock = interaction?.shouldAlwaysShowEdge(edge);
-                let filtered;
-                const filter = activeFilters[edge.type || "DEFAULT"]
-                if (filter.bidirectional){
-                    filtered = filter.show
-                } else {
-                    if (direction == "forward") filtered = filter.showForward;
-                    else if (direction == "backward") filtered = filter.showBackward;
-                }
-                return filtered || interactionLock
-            } ).some(Boolean))
+        let filterLock;
+        const filterStatus = activeFilters[edge.type];
+        if(filterStatus.bidirectional) {
+            filterLock = filterStatus.show;
+        } else {
+            if (direction == "forward") filterLock = filterStatus.showForward;
+            else if (direction == "backward") filterLock = filterStatus.showBackward;
         }
-        console.log(edgeMask);
-        
 
-        filteredEdges = edges.filter((edge) => {
-            return edgeMask.get(edge.source + "->" + edge.target + "|" + edge.type);
-        })
+        return filterLock || interactionLock;
+    }
 
-        filteredEdges.forEach((edge, i, arr) => {
+    let filteredEdges: GraphEdge[] = $derived(edges.filter((edge) => {
+        console.log("Tokão!")
+        const edgeOwners = edgeOwnershipMap.get(edge.source + "->" + edge.target + "|" + edge.type);
+        if(edgeOwners){
+            for(const [interactionId, direction] of edgeOwners){
+                if(auxGetEdgeVisibility(edge, interactionId, direction)) return true;
+            }
+            return false;
+        } else {
+            console.error(`Edge ${edge} does not have any owner!`);
+            return false;
+        }
+    }))
+
+
+    function auxGetNodeVisibility(node: GraphNode, interactionId: string){
+        const interaction = activeInteractions.find(
+            (interaction) => interaction.getId() == interactionId
+        )
+        return interaction?.shouldAlwaysShowNode(node);
+    }
+
+    let filteredNodes: GraphNode[] = $derived.by(() => {
+        console.log("Tokão2!")
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity
+        const nodeMask: Map<string, number> = new Map();
+        filteredEdges.forEach((edge) => {
             nodeMask.set(edge.source, (nodeMask.get(edge.source) || 0) + 1);
             nodeMask.set(edge.target, (nodeMask.get(edge.target) || 0) + 1);
         })
-        filteredNodes = nodes.filter((node) => {
-            const visibleEdges = nodeMask.get(node.id) > 0;
-            const interacionLock = Array.from(nodeOwnershipMap.get(node.id), (interactionId) => {
-                const interaction = activeInteractions.find((i) => i.getId() == interactionId);
-                const interactionLock = interaction?.shouldAlwaysShowNode(node);
-                return interactionLock
-            } ).some(Boolean)
-            console.log(visibleEdges, interacionLock);
-            return visibleEdges || interacionLock;
-        });
-        console.log("filtered nodes lenght", filteredNodes.length, "filtered edges lenght", filteredEdges.length);
-    }
+        return nodes.filter((node) => {
+            const nodeOwners = nodeOwnershipMap.get(node.id);
+            if(nodeOwners){
+                //If any interaction requires node presence, then fix it
+                for(const interactionId of nodeOwners){
+                    if(auxGetNodeVisibility(node, interactionId)) return true;
+                }
+                //Otherwise do it based on the incoming edge count
+                const incomingEdgeCount = nodeMask.get(node.id);
+                if (incomingEdgeCount) return incomingEdgeCount > 0
+                return false;
+            } else {
+                console.error(`Node ${node} does not have any owner!`);
+                return false;
+            }
+        })
+    })
 
-    /*function blah blah {
-        => edgemask = [] - ou um map
-        nodemask = [] - ou um map
-        for each aresta:
-        aresta.show = any(interaction.neverhide(aresta)) OR aresta.type.show (ou é segurada ou não tá filtrada, esse type eu sei a direção via os eventos que fizeram ela surgir)
-        se aresta show: coloca contador de arestas visiveis pro nó
-        for each node:
-        node.show = nodemaskcounter != 0 OR any(interaction.neverhide(node))
-        daí passa as coisas com as masks
-    }*/
-    
-    //TODO: improve this, decide where the logic goes
-    async function expandArtist(artistId: string) {
-        try {
-            const newInteraction = await ExpandInteraction.create(artistId);
-            selectedInteraction = newInteraction;
-            if (!activeInteractions.some((interaction) => interaction.getId() == newInteraction.getId())) addInteraction(newInteraction);
-            applyFilter();
-        } catch (e) {
-            console.error(e);
-        } finally {
-            console.log("finished expanding");
-        }
-    }
+    //TODO: MAKE THAT LOGIC ACTUALLY GOOD (delimit when will filters be called, how svelte reactivity should be used and how data flows between the components)
+    // function applyFilter(){
+    //     const edgeMask: Map<string, boolean> = new Map();
+    //     const nodeMask: Map<string, number> = new Map();
+    //     for (const edge of edges) {
+    //         edgeMask.set(edge.source + "->" + edge.target + "|" + edge.type, Array.from(edgeOwnershipMap.get(edge.source + "->" + edge.target + "|" + edge.type), ([interactionId, direction]) => {
+    //             const interaction = activeInteractions.find((i) => i.getId() == interactionId);
+    //             const interactionLock = interaction?.shouldAlwaysShowEdge(edge);
+    //             let filtered;
+    //             const filter = activeFilters[edge.type || "DEFAULT"]
+    //             if (filter.bidirectional){
+    //                 filtered = filter.show
+    //             } else {
+    //                 if (direction == "forward") filtered = filter.showForward;
+    //                 else if (direction == "backward") filtered = filter.showBackward;
+    //             }
+    //             return filtered || interactionLock
+    //         } ).some(Boolean))
+    //     }
+    //     console.log(edgeMask);
+        
+
+    //     filteredEdges = edges.filter((edge) => {
+    //         return edgeMask.get(edge.source + "->" + edge.target + "|" + edge.type);
+    //     })
+
+    //     filteredEdges.forEach((edge, i, arr) => {
+    //         nodeMask.set(edge.source, (nodeMask.get(edge.source) || 0) + 1);
+    //         nodeMask.set(edge.target, (nodeMask.get(edge.target) || 0) + 1);
+    //     })
+    //     filteredNodes = nodes.filter((node) => {
+    //         const visibleEdges = nodeMask.get(node.id) > 0;
+    //         const interacionLock = Array.from(nodeOwnershipMap.get(node.id), (interactionId) => {
+    //             const interaction = activeInteractions.find((i) => i.getId() == interactionId);
+    //             const interactionLock = interaction?.shouldAlwaysShowNode(node);
+    //             return interactionLock
+    //         } ).some(Boolean)
+    //         console.log(visibleEdges, interacionLock);
+    //         return visibleEdges || interacionLock;
+    //     });
+    //     console.log("filtered nodes lenght", filteredNodes.length, "filtered edges lenght", filteredEdges.length);
+    // }
 
 
     onMount(() => {
@@ -234,9 +290,7 @@
 </script>
 
 
-
-<!-- <Graph nodes={nodes} edges={edges} graphChangesCounter={graphChangesCounter} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction}/> -->
-<Graph nodes={filteredNodes} edges={filteredEdges} graphChangesCounter={graphChangesCounter} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction}/>
+<Graph nodes={filteredNodes} edges={filteredEdges} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction}/>
 
 <RelationshipFilter activeFilters={activeFilters}/>
 

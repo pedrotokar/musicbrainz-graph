@@ -38,8 +38,17 @@
     import type { GraphNode, GraphEdge, SimulationNode, SimulationEdge, NodeContext } from "$lib/types";
 
     import { relationshipData } from "$lib/components/graphs/relationships";
+	import type { GraphInteraction } from "$lib/interactions/abstractInteraction";
 
-    let { nodes, edges, graphChangesCounter, onClickCallbackFunction, selectedInteraction } = $props();
+    interface Props {
+        nodes: GraphNode[];
+        edges: GraphEdge[];
+//        graphChangesCounter: number;
+        onClickCallbackFunction: (nodeId: string) => void;
+        selectedInteraction: GraphInteraction | undefined;
+    }
+
+    let { nodes, edges, onClickCallbackFunction, selectedInteraction }: Props = $props();
 
     let simulationNodes: SimulationNode[] = $state([])
     let simulationEdges: SimulationEdge[] = $state([])
@@ -133,7 +142,24 @@
 
     let zoomBehavior: ZoomBehavior<SVGSVGElement, unknown> = d3.zoom<SVGSVGElement, unknown>().on("zoom", onZoom);
 
+
+    // ------------------- Implementing the tooltip feature-------------------
+    // function getTooltipFromContext(context: NodeContext) {
+    //     return "Olá!";
+    // }
+
+    // function getNodeTooltip(node: SimulationNode) {
+    //     const nodeContext = selectedInteraction.getNodeContext(node.id);
+    //     return getTooltipFromContext(nodeContext);
+    // }
+
+
+    // ---------------------- Implementing color legend ----------------------
     //Used to implement the node coloring feature
+    //Since I've decided not to embed the color management in the interaction
+    //itself, I need to go from context based on interaction to the actual color
+    //and that's what I'm doing here
+ 
     function getColorFromContext(context: NodeContext) {
         if (context.isOrigin) return "#3b82f6";
         if (!context.isRelated) return "#4b5563"; 
@@ -150,19 +176,14 @@
         }
     }
 
-    // function getTooltipFromContext(context: NodeContext) {
-    //     return "Olá!";
-    // }
-
     function getNodeColor(node: SimulationNode) {
-        const nodeContext = selectedInteraction.getNodeContext(node.id);
-        return getColorFromContext(nodeContext);
+        if(selectedInteraction){
+            const nodeContext = selectedInteraction.getNodeContext(node);
+            return getColorFromContext(nodeContext);
+        } else {
+            console.error(`Tried to render node ${node} but there was no active interaction (check why there is nodes if there aren't interactions)`)
+        }
     }
-
-    // function getNodeTooltip(node: SimulationNode) {
-    //     const nodeContext = selectedInteraction.getNodeContext(node.id);
-    //     return getTooltipFromContext(nodeContext);
-    // }
 
     // ------------------ Implementing simulation management ------------------
     let simulation: d3.Simulation<SimulationNode, SimulationEdge>;
@@ -178,7 +199,7 @@
             console.error("Somehow setupSimulation was called before the svg was \
              drawn and consequently when svgNode variable is still undefined")
         }
-        // setInterval(() => {simulation.stop()}, 5000)
+        setTimeout(() => {simulation.stop()}, 5000)
         console.log("Setup initial graph simulation");
     }
     
@@ -190,6 +211,7 @@
             simulation.alpha(1).restart();
             
             console.log("Updated Graph simulation with synced nodes");
+            setTimeout(() => {simulation.stop()}, 5000)
         } else {
             console.error("Somehow updateSimulation was called before the \
             simulation var was actually initialised with a simulation")
@@ -200,7 +222,7 @@
     // ------------------ Implementing orchestration based on events ------------------
 
     $effect(() => {
-        console.log(graphChangesCounter);
+        console.log("Effect on graph component was called", nodes, edges);
         if(!simulation){
             return;
         }

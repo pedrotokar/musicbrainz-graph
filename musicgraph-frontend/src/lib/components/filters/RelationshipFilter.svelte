@@ -7,6 +7,8 @@
 
 </script>
 
+<h1>Filtro de arestas</h1>
+
 <ul class="color-legend">
     {#each Object.entries(legendItems) as relationship (relationship[0])}
         {#if relationship[1].bidirectional}

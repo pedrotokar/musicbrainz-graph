@@ -6,7 +6,7 @@
 
 	interface Props {
         activeInteractions: GraphInteraction[];
-        removeInteractionCallback: (id: string | number) => void;
+        removeInteractionCallback: (interactionId: string) => void;
         selectInteractionCallback: (interaction: GraphInteraction) => void;
     }
     let { activeInteractions, removeInteractionCallback, selectInteractionCallback }: Props = $props();

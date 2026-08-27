@@ -10,10 +10,18 @@ export abstract class GraphInteraction {
         return this.id;
     }
 
-    //TODO: improve edge context if I decide to go that way
+    //Get the text that is shown to the user to refer to the interaction
     abstract getShowText(): string;
-    abstract getNodeContext(nodeId: string): NodeContext;
+
+    // Get some node/edge information based on that interaction context. Used 
+    // for coloring, tooltips and whatever thing that depends on the node/edge
+    // and the interaction
+    abstract getNodeContext(node: GraphNode): NodeContext;
     abstract getEdgeContext(edge: GraphEdge): EdgeContext;
+
+    // Get information on whetever the interaction requires a certain node
+    // to be always visible. Ideally all interactions should leave at least 
+    // one meaningfull node always shown
     abstract shouldAlwaysShowNode(node: GraphNode): boolean;
     abstract shouldAlwaysShowEdge(edge: GraphEdge): boolean;
 
