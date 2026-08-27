@@ -21,7 +21,7 @@
 				// class:selected={selectedNode
 				// 	? node.id === selectedNode.id
 				// 	: false}
-				onclick={() => selectInteractionCallback(interaction)} onkeydown={() => console.log("hi")}
+				onclick={() => selectInteractionCallback(interaction)} onkeydown={() => selectInteractionCallback(interaction)}
 			>
 				<div class="expand-interaction-text" class:hid={index > 4}>
 					{interaction.getShowText()}

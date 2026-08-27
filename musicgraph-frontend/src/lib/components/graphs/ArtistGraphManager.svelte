@@ -1,8 +1,7 @@
 <script lang="ts">
     //TODO: figure out how to sinalize that an API Error occured
-    //TODO: put relationship filter in the right places
     //TODO: fix all the places where I use an edge ID
-    //TODO: Change interactionregistry from array to map
+    //TODO: Change interaction registry from array to map
 
     //Svelte imports
     import { onMount } from "svelte";
@@ -178,7 +177,6 @@
     }
 
     let filteredEdges: GraphEdge[] = $derived(edges.filter((edge) => {
-        console.log("Tokão!")
         const edgeOwners = edgeOwnershipMap.get(edge.source + "->" + edge.target + "|" + edge.type);
         if(edgeOwners){
             for(const [interactionId, direction] of edgeOwners){
@@ -200,7 +198,6 @@
     }
 
     let filteredNodes: GraphNode[] = $derived.by(() => {
-        console.log("Tokão2!")
         // eslint-disable-next-line svelte/prefer-svelte-reactivity
         const nodeMask: Map<string, number> = new Map();
         filteredEdges.forEach((edge) => {
@@ -225,59 +222,15 @@
         })
     })
 
-    //TODO: MAKE THAT LOGIC ACTUALLY GOOD (delimit when will filters be called, how svelte reactivity should be used and how data flows between the components)
-    // function applyFilter(){
-    //     const edgeMask: Map<string, boolean> = new Map();
-    //     const nodeMask: Map<string, number> = new Map();
-    //     for (const edge of edges) {
-    //         edgeMask.set(edge.source + "->" + edge.target + "|" + edge.type, Array.from(edgeOwnershipMap.get(edge.source + "->" + edge.target + "|" + edge.type), ([interactionId, direction]) => {
-    //             const interaction = activeInteractions.find((i) => i.getId() == interactionId);
-    //             const interactionLock = interaction?.shouldAlwaysShowEdge(edge);
-    //             let filtered;
-    //             const filter = activeFilters[edge.type || "DEFAULT"]
-    //             if (filter.bidirectional){
-    //                 filtered = filter.show
-    //             } else {
-    //                 if (direction == "forward") filtered = filter.showForward;
-    //                 else if (direction == "backward") filtered = filter.showBackward;
-    //             }
-    //             return filtered || interactionLock
-    //         } ).some(Boolean))
-    //     }
-    //     console.log(edgeMask);
-        
-
-    //     filteredEdges = edges.filter((edge) => {
-    //         return edgeMask.get(edge.source + "->" + edge.target + "|" + edge.type);
-    //     })
-
-    //     filteredEdges.forEach((edge, i, arr) => {
-    //         nodeMask.set(edge.source, (nodeMask.get(edge.source) || 0) + 1);
-    //         nodeMask.set(edge.target, (nodeMask.get(edge.target) || 0) + 1);
-    //     })
-    //     filteredNodes = nodes.filter((node) => {
-    //         const visibleEdges = nodeMask.get(node.id) > 0;
-    //         const interacionLock = Array.from(nodeOwnershipMap.get(node.id), (interactionId) => {
-    //             const interaction = activeInteractions.find((i) => i.getId() == interactionId);
-    //             const interactionLock = interaction?.shouldAlwaysShowNode(node);
-    //             return interactionLock
-    //         } ).some(Boolean)
-    //         console.log(visibleEdges, interacionLock);
-    //         return visibleEdges || interacionLock;
-    //     });
-    //     console.log("filtered nodes lenght", filteredNodes.length, "filtered edges lenght", filteredEdges.length);
-    // }
-
-
     onMount(() => {
         expandArtist("eeb1195b-f213-4ce1-b28c-8565211f8e43").then(() => {}).catch((error) => {console.error(error);});
-        // setTimeout(() => {expandArtist("d8433dee-d1a8-4b40-b27c-40bc53481167").then(() => {}).catch((error) => {console.error(error);}); }, 5000);
-        // setTimeout(() => {expandArtist("dc5caa1a-2be6-4104-a34e-fab24dcd4abe").then(() => {}).catch((error) => {console.error(error);}); }, 10000);
-        // setTimeout(() => {expandArtist("d338e1b0-1f9c-4a4a-9c74-e2ffa4de79b2").then(() => {}).catch((error) => {console.error(error);}); }, 15000);
-        // setTimeout(() => {expandArtist("21176a1c-bdbf-43d0-aaae-5f2df97b09bd").then(() => {}).catch((error) => {console.error(error);}); }, 20000);
-        // setTimeout(() => {expandArtist("3a528006-1429-47f4-ae9b-2ea95343e16a").then(() => {}).catch((error) => {console.error(error);}); }, 25000);
+        setTimeout(() => {expandArtist("d8433dee-d1a8-4b40-b27c-40bc53481167").then(() => {}).catch((error) => {console.error(error);}); }, 5000);
+        setTimeout(() => {expandArtist("dc5caa1a-2be6-4104-a34e-fab24dcd4abe").then(() => {}).catch((error) => {console.error(error);}); }, 10000);
+        setTimeout(() => {expandArtist("d338e1b0-1f9c-4a4a-9c74-e2ffa4de79b2").then(() => {}).catch((error) => {console.error(error);}); }, 15000);
+        setTimeout(() => {expandArtist("21176a1c-bdbf-43d0-aaae-5f2df97b09bd").then(() => {}).catch((error) => {console.error(error);}); }, 20000);
+        setTimeout(() => {expandArtist("3a528006-1429-47f4-ae9b-2ea95343e16a").then(() => {}).catch((error) => {console.error(error);}); }, 25000);
         setTimeout(() => {expandArtist("b51c672b-85e0-48fe-8648-470a2422229f").then(() => {}).catch((error) => {console.error(error);}); }, 30000);
-        // setTimeout(() => {expandArtist("ba550d0e-adac-4864-b88b-407cab5e76af").then(() => {}).catch((error) => {console.error(error);}); }, 35000);
+        setTimeout(() => {expandArtist("ba550d0e-adac-4864-b88b-407cab5e76af").then(() => {}).catch((error) => {console.error(error);}); }, 35000);
     })
     
     // $inspect("Active interactions: ", activeInteractions);
