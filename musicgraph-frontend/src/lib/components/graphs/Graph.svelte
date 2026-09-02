@@ -35,9 +35,9 @@
 
     //Type imports
     import type { D3ZoomEvent, ZoomBehavior, D3DragEvent, DragBehavior } from "d3";
-    import type { GraphNode, GraphEdge, SimulationNode, SimulationEdge, NodeContext } from "$lib/types";
+    import type { GraphNode, GraphEdge, SimulationNode, SimulationEdge, NodeContext, FilterState, EdgeContext } from "$lib/types";
 
-    import { relationshipData } from "$lib/components/graphs/relationships";
+    import { relationshipData, RELATIONSHIP_PRIORITY_ORDER } from "$lib/components/graphs/relationships";
 	import type { GraphInteraction } from "$lib/interactions/abstractInteraction";
 
     interface Props {
@@ -46,9 +46,10 @@
 //        graphChangesCounter: number;
         onClickCallbackFunction: (nodeId: string) => void;
         selectedInteraction: GraphInteraction | undefined;
+        activeFilters: FilterState;
     }
 
-    let { nodes, edges, onClickCallbackFunction, selectedInteraction }: Props = $props();
+    let { nodes, edges, onClickCallbackFunction, selectedInteraction, activeFilters }: Props = $props();
 
     let simulationNodes: SimulationNode[] = $state([])
     let simulationEdges: SimulationEdge[] = $state([])
@@ -160,19 +161,58 @@
     //itself, I need to go from context based on interaction to the actual color
     //and that's what I'm doing here
  
+    function isEdgeVisible(edge: GraphEdge, direction: EdgeContext): boolean {
+        const filterStatus = activeFilters[edge.type];
+        if (!filterStatus) return true;
+        if (filterStatus.bidirectional) {
+            return filterStatus.show;
+        } else {
+            if (direction === "forward") return filterStatus.showForward;
+            if (direction === "backward") return filterStatus.showBackward;
+            return false;
+        }
+    }
+
+    function getRelationshipPriority(type: string): number {
+        const index = RELATIONSHIP_PRIORITY_ORDER.indexOf(type);
+        return index !== -1 ? index : Number.MAX_SAFE_INTEGER;
+    }
+
     function getColorFromContext(context: NodeContext) {
         if (context.isOrigin) return "#3b82f6";
-        if (!context.isRelated) return "#4b5563"; 
-        
-        if (context.relationshipType && context.relationshipDirection){
-            const relationshipDict = relationshipData[context.relationshipType || "DEFAULT"] || relationshipData["DEFAULT"];
-            if (!relationshipDict.bidirectional) {
-                return relationshipDict[context.relationshipDirection].color
-            } else {
-                return relationshipDict.color;
-            }
+        if (!context.isRelated || !selectedInteraction) return "#4b5563";
+
+        // Filter out edges that are hidden by the active filters
+        const activeEdgesWithDirection = context.edges
+            .map((edge) => ({
+                edge,
+                direction: selectedInteraction!.getEdgeContext(edge),
+            }))
+            .filter(({ edge, direction }) => isEdgeVisible(edge, direction));
+
+        if (activeEdgesWithDirection.length === 0) {
+            return "#4b5563";
+        }
+
+        // Sort edges by priority order (lower index = higher priority), and forward before backward
+        activeEdgesWithDirection.sort((a, b) => {
+            const priorityDiff = getRelationshipPriority(a.edge.type) - getRelationshipPriority(b.edge.type);
+            if (priorityDiff !== 0) return priorityDiff;
+
+            if (a.direction === "forward" && b.direction === "backward") return -1;
+            if (a.direction === "backward" && b.direction === "forward") return 1;
+            return 0;
+        });
+
+        const winning = activeEdgesWithDirection[0];
+        const relationshipDict = relationshipData[winning.edge.type] || relationshipData["DEFAULT"];
+        if (!relationshipDict) return "#000000";
+
+        if (relationshipDict.bidirectional) {
+            return relationshipDict.color;
         } else {
-            return "#000000"
+            const dir = winning.direction === "backward" ? "backward" : "forward";
+            return relationshipDict[dir].color;
         }
     }
 
@@ -199,7 +239,7 @@
             console.error("Somehow setupSimulation was called before the svg was \
              drawn and consequently when svgNode variable is still undefined")
         }
-        setTimeout(() => {simulation.stop()}, 5000)
+//        setTimeout(() => {simulation.stop()}, 5000)
         console.log("Setup initial graph simulation");
     }
     
@@ -211,7 +251,7 @@
             simulation.alpha(1).restart();
             
             console.log("Updated Graph simulation with synced nodes");
-            setTimeout(() => {simulation.stop()}, 5000)
+//            setTimeout(() => {simulation.stop()}, 5000)
         } else {
             console.error("Somehow updateSimulation was called before the \
             simulation var was actually initialised with a simulation")

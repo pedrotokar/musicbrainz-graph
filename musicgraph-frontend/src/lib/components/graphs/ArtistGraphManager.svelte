@@ -243,7 +243,7 @@
 </script>
 
 
-<Graph nodes={filteredNodes} edges={filteredEdges} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction}/>
+<Graph nodes={filteredNodes} edges={filteredEdges} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction} activeFilters={activeFilters}/>
 
 <RelationshipFilter activeFilters={activeFilters}/>
 

@@ -54,29 +54,20 @@ export class ExpandInteraction extends GraphInteraction {
         if (node.id === this.originNodeId) {
             return { 
                 isOrigin: true, 
-                isRelated: false 
+                isRelated: false,
+                edges: []
             };
         }
         
-        //TODO: handle multi edge
-        const edge = this.interactionAPIResponse["edges"].find(edge => 
+        const edges = this.interactionAPIResponse["edges"].filter(edge => 
             (edge.source === this.originNodeId && edge.target === node.id) ||
             (edge.target === this.originNodeId && edge.source === node.id)
         );
 
-        if (edge) {
-            return {
-                isOrigin: false,
-                isRelated: true,
-                relationshipType: edge.type,
-                relationshipDirection: edge.source === this.originNodeId ? "forward" : "backward",
-                relationshipMetadata: edge.parameters
-            };
-        }
-
         return { 
             isOrigin: false, 
-            isRelated: false 
+            isRelated: edges.length > 0,
+            edges
         };
     }
 

@@ -17,7 +17,17 @@ const colorScheme = [
     "#6a3d9a",
     "#ffff99",
     "#b15928",
-]
+];
+
+export const RELATIONSHIP_PRIORITY_ORDER: string[] = [
+    "HAS_MUSICAL_CONNECTION_TO",
+    "COLLABORATED_WITH",
+    "COVERED",
+    "SAMPLED",
+    "HAS_PERSONAL_CONNECTION_TO",
+    "PRODUCED",
+    "DEFAULT",
+];
 
 export const relationshipData: RelationshipRegistry = {
     "HAS_PERSONAL_CONNECTION_TO": {

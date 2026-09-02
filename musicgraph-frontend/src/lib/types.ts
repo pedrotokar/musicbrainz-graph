@@ -43,9 +43,7 @@ export interface SimulationEdge extends SimulationLinkDatum<SimulationNode> {
 export interface NodeContext {
     isOrigin: boolean;
     isRelated: boolean;
-    relationshipType?: string; 
-    relationshipDirection?: "forward" | "backward";
-    relationshipMetadata?: Record<string, string>; 
+    edges: GraphEdge[];
 }
 
 export type EdgeContext = "forward" | "backward" | "bidirectional" | undefined;
