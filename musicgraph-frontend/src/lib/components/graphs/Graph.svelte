@@ -1,4 +1,5 @@
 <script lang="ts">
+    /* eslint-disable svelte/no-at-html-tags */
     /* How does this component work?
 
     Its main and only purporse is to display the graph and manage interactive
@@ -204,12 +205,24 @@
             const relationshipDict = relationshipData[edge.type] || relationshipData["DEFAULT"];
             if (!relationshipDict) return "Erro!";
 
+            const sourceNode = nodes.find(n => n.id === edge.source);
+            const targetNode = nodes.find(n => n.id === edge.target);
+            const sourceName = sourceNode?.display_name || "Desconhecido";
+            const targetName = targetNode?.display_name || "Desconhecido";
+
+            const direction = selectedInteraction?.getEdgeContext(edge);
+
             if (relationshipDict.bidirectional) {
-                tooltipString += relationshipDict.tooltipGenerator(edge);
-            }// else {
-            //    const dir = winning.direction === "backward" ? "backward" : "forward";
-            //    return relationshipDict[dir].color;
-            //}
+                if (relationshipDict.tooltipGenerator) {
+                    tooltipString += relationshipDict.tooltipGenerator(edge, sourceName, targetName);
+                }
+            } else {
+                if (direction === "forward" && relationshipDict.forward.tooltipGenerator) {
+                    tooltipString += relationshipDict.forward.tooltipGenerator(edge, sourceName, targetName);
+                } else if (direction === "backward" && relationshipDict.backward.tooltipGenerator) {
+                    tooltipString += relationshipDict.backward.tooltipGenerator(edge, sourceName, targetName);
+                }
+            }
             
         }
         return tooltipString
@@ -384,8 +397,7 @@
 
 {#if hoveredNode}
 <div id="tooltip" {@attach tooltipPosition}>
-    Esse é meu tooltip!
-    {getNodeTooltip(hoveredNode)}
+    {@html getNodeTooltip(hoveredNode)}
 </div>
 {/if}
 

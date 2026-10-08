@@ -53,6 +53,7 @@ export type EdgeContext = "forward" | "backward" | "bidirectional" | undefined;
 export interface RelationshipDictionary {
     color: string;
     displayName: string;
+    tooltipGenerator?: (edge: GraphEdge, sourceName: string, targetName: string) => string;
 }
 
 
