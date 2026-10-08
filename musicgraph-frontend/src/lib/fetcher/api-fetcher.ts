@@ -4,6 +4,7 @@ export const URL_API = "http://127.0.0.1:8000";
 export async function getArtistAdjacentNodes(artistId: string) {
     const response = await fetch(`${URL_API}/artist/${artistId}/adjacent`);
     const rawGraphData = await response.json() as GenericAPIResponse;
+    console.log(rawGraphData);
     return rawGraphData;
 }
 //    return normalizeGraph(rawGraphData);

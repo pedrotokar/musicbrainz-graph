@@ -242,14 +242,13 @@
 
 </script>
 
+<RelationshipFilter activeFilters={activeFilters}/>
 
 <Graph nodes={filteredNodes} edges={filteredEdges} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction} activeFilters={activeFilters}/>
 
-<RelationshipFilter activeFilters={activeFilters}/>
-
 <InteractionList activeInteractions={activeInteractions} removeInteractionCallback={removeInteraction} selectInteractionCallback={selectInteraction}/>
 
-{#each nodes as node (node.id)}    
+<!-- {#each nodes as node (node.id)}    
 <p>
     {node.id} - {node.display_name}
 </p>
@@ -259,7 +258,7 @@
 <p>
     {edge.source} -> {edge.target} - {edge.type}
 </p>
-{/each}
+{/each} -->
 
 
 

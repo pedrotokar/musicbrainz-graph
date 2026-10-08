@@ -1,4 +1,4 @@
-import type { RelationshipRegistry } from "$lib/types"
+import type { GraphEdge, RelationshipRegistry } from "$lib/types"
 
 //Legendas
 //Cores
@@ -43,7 +43,14 @@ export const relationshipData: RelationshipRegistry = {
     "COLLABORATED_WITH": {
         "bidirectional": true,
         "displayName": "Fez lançamentos em colaboração com o artista selecionado",
-        "color": colorScheme[5]
+        "color": colorScheme[5],
+        "tooltipGenerator": (edge: GraphEdge) => {
+            let string = "Fulano colaborou com ciclano nas seguintes gravações: "
+            for (const [recording_id, recording_title] of edge.parameters.collaboration_recordings){
+                string += recording_id + " " + recording_title
+            }
+            return string;
+        }
     },
     "COVERED": {
         "bidirectional": false,

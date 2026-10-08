@@ -3,7 +3,7 @@ import { GraphInteraction } from './abstractInteraction';
 import { getArtistAdjacentNodes } from '$lib/fetcher/api-fetcher';
 
 export class ExpandInteraction extends GraphInteraction {
-    //Singleton logic
+    //Singleton logic (indexed on node id)
     static #instances: Map<string, WeakRef<ExpandInteraction>> = new Map();
     static #registry = new FinalizationRegistry((key: string) => {
         ExpandInteraction.#instances.delete(key);

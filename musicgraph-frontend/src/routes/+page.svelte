@@ -3,6 +3,5 @@
 </script>
 
 <h1>Music Graph Explorer</h1>
-<p>Fazendo testes</p>
 
 <ArtistGraphManager/>

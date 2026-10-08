@@ -31,6 +31,7 @@
 
     //Svelte and D3 imports
     import { onMount, untrack } from "svelte";
+    import { computePosition, flip, shift, offset, autoUpdate } from '@floating-ui/dom';
     import * as d3 from "d3";
 
     //Type imports
@@ -53,6 +54,8 @@
 
     let simulationNodes: SimulationNode[] = $state([])
     let simulationEdges: SimulationEdge[] = $state([])
+    let hoveredNode: SimulationNode | undefined = $state()
+    let hoveredElement: SVGElement | undefined = $state()
 
     let width: number = 1280;
     let height: number = 720;
@@ -103,7 +106,10 @@
     }
 
     // Used to implement the drag feature. D3 only helps handling the physics 
-    // and not the screen writing.
+    // and not the screen writing. 
+    // What I'm doing here is creating an svelte action factory: I get a action
+    // that is tied to the node that's being passed onto the function. This is
+    // done because the action is tied to the html element and not the data node
     function draggable(node: SimulationNode){
         return (nodeElement: SVGElement) => {
 
@@ -124,11 +130,12 @@
                 });
 
             d3.select(nodeElement).datum(node).call(drag);
-            return () => {
-                d3.select(nodeElement).on(".drag", null);
+            return {
+                destroy() {
+                    d3.select(nodeElement).on(".drag", null);
+                }
             }
         }
-
     }
 
     // Used to implement the zooming feature. D3 only helps giving the
@@ -145,14 +152,77 @@
 
 
     // ------------------- Implementing the tooltip feature-------------------
-    // function getTooltipFromContext(context: NodeContext) {
-    //     return "Olá!";
-    // }
+    
+    // This is an action called in the tooltip tag. It makes the element position
+    // to be tied with the hovered node with the help of floating UI lib. 
+    function tooltipPosition(tooltipElement: HTMLElement){
+        $effect(() => {
+            //Will be updated every time the hovered node changes
+            function updatePosition(){
+                if(hoveredElement){
+                    computePosition( 
+                        //This function does the hard lifiting of calculating the 
+                        //tooltip position based on the hoveredElement element
+                        hoveredElement, 
+                        tooltipElement, 
+                        {
+                            placement: "right", 
+                            middleware: [flip(), shift(), offset(8)]
+                        }
+                    ).then(({x, y}) => {
+                        Object.assign(tooltipElement.style, {
+                            left: `${x}px`,
+                            top:  `${y}px`
+                        })
+                    })
+                }
+            }
+            if(hoveredElement){
+                const cleanup = autoUpdate(
+                    hoveredElement,
+                    tooltipElement,
+                    updatePosition
+                );
 
-    // function getNodeTooltip(node: SimulationNode) {
-    //     const nodeContext = selectedInteraction.getNodeContext(node.id);
-    //     return getTooltipFromContext(nodeContext);
-    // }
+                return () => {
+                    cleanup();
+                }
+            }
+        })
+    }
+
+
+    function getTooltipFromContext(context: NodeContext) {
+        if (context.isOrigin){
+            return "Este é o nó de origem";
+        }
+        if (!context.isRelated){
+            return "";
+        }
+        var tooltipString = "";
+        for (const edge of context.edges){
+            const relationshipDict = relationshipData[edge.type] || relationshipData["DEFAULT"];
+            if (!relationshipDict) return "Erro!";
+
+            if (relationshipDict.bidirectional) {
+                tooltipString += relationshipDict.tooltipGenerator(edge);
+            }// else {
+            //    const dir = winning.direction === "backward" ? "backward" : "forward";
+            //    return relationshipDict[dir].color;
+            //}
+            
+        }
+        return tooltipString
+    }
+
+    function getNodeTooltip(node: SimulationNode) {
+        if(selectedInteraction){
+            const nodeContext = selectedInteraction.getNodeContext(node);
+            return getTooltipFromContext(nodeContext);
+        } else {
+            console.error(`Tried to render tooltip for node ${node} but there was no active interaction (check why there is nodes if there aren't interactions)`)
+        }
+    }
 
 
     // ---------------------- Implementing color legend ----------------------
@@ -281,8 +351,6 @@
 
 </script>
 
-<!-- <h1>O grafo vai entrar aqui em algum momento com uma tag canvas I guess (na real era svg)</h1> -->
-
 <svg id="ArtistGraphSVG"
      width="{width}" height="{height}"
      viewBox="{-width/2}, {-height/2}, {width}, {height}"
@@ -302,6 +370,8 @@
             <g transform="translate({node.x},{node.y})" 
                {@attach draggable(node)} 
                onclick={() => onNodeClick(node)} onkeydown={() => onNodeClick(node)} 
+               onmouseenter={(event) => {hoveredElement = event.currentTarget; hoveredNode = node}} 
+               onmouseleave={() => {hoveredElement = undefined; hoveredNode = undefined}}
                role="button" tabindex="0"
                >
                 <!-- <circle r="20" fill="blue"/> -->
@@ -310,15 +380,26 @@
             </g>
         {/each}
     </g>
-    
 </svg>
 
-<div class="tooltip"></div>
+{#if hoveredNode}
+<div id="tooltip" {@attach tooltipPosition}>
+    Esse é meu tooltip!
+    {getNodeTooltip(hoveredNode)}
+</div>
+{/if}
 
 <style>
     #ArtistGraphSVG {
         border-style: solid;
         border-radius: 4px;
         border-color: purple;
+    }
+
+    #tooltip {
+        width: max-content;
+        position: absolute;
+        top: 0;
+        left: 0;
     }
 </style>

@@ -1,6 +1,11 @@
 from neo4j.graph import Node, Relationship
 from .types import EdgeModel, NodeModel
 
+def sanitize_value(val):
+    if hasattr(val, "iso_format"):
+        return val.iso_format()
+    return val
+
 def normalize_node(node: Node) -> NodeModel:
     node_dict = {}
 
@@ -11,7 +16,7 @@ def normalize_node(node: Node) -> NodeModel:
     node_dict["parameters"] = {}
     for key, value in node.items():
         if key == "id": continue
-        node_dict["parameters"][key] = value
+        node_dict["parameters"][key] = sanitize_value(value)
 
     return node_dict
 
@@ -26,7 +31,7 @@ def normalize_edge(edge: Relationship, start_id: str, end_id: str) -> EdgeModel:
 
     edge_dict["parameters"] = {}
     for key, value in edge.items():
-        edge_dict["parameters"][key] = value
+        edge_dict["parameters"][key] = sanitize_value(value)
     
     return edge_dict
 
