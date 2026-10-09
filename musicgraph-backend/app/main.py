@@ -15,6 +15,9 @@ DATABASE_NAME = "neo4j"
 with open("app/queries/adjacent_artists.cypher", "r") as f:
     adjacent_artists_query = f.read()
 
+with open("app/queries/search_artists.cypher", "r") as f:
+    search_artists_query = f.read()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -36,6 +39,31 @@ app.add_middleware(
 @app.get("/")
 async def read_root():
     return {"Hello": "World"}
+
+@app.get("/artist/search")
+async def search_artists(
+    q: str,
+    request: Request
+):
+    driver = request.app.state.neo4j_driver
+    # Append ~ for fuzzy matching in Neo4j fulltext index
+    query_param = f"{q}~"
+
+    records, _, _ = await driver.execute_query(
+        search_artists_query,
+        query=query_param,
+        database_=DATABASE_NAME,
+    )
+
+    results = []
+    for record in records:
+        results.append({
+            "id": record["id"],
+            "name": record["name"],
+            "score": record["finalScore"]
+        })
+
+    return results
 
 @app.get("/artist/{artist_id}/adjacent")
 async def get_near_artists(

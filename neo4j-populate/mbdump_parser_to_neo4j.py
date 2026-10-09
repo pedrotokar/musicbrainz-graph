@@ -44,6 +44,7 @@ driver.execute_query("CREATE CONSTRAINT IF NOT EXISTS FOR (n:Work) REQUIRE n.id 
 driver.execute_query("CREATE CONSTRAINT IF NOT EXISTS FOR (n:Release) REQUIRE n.id IS UNIQUE")
 driver.execute_query("CREATE CONSTRAINT IF NOT EXISTS FOR (n:ReleaseGroup) REQUIRE n.id IS UNIQUE")
 driver.execute_query("CREATE CONSTRAINT IF NOT EXISTS FOR (n:Recording) REQUIRE n.id IS UNIQUE")
+# driver.execute_query("CREATE FULLTEXT INDEX artist_search FOR (n:Artist) ON EACH [n.name, n.aliases];")
 
 def get_batch_insert_function(query):
     def batch_insert(tx, batch):
@@ -67,6 +68,8 @@ entity_queries = {
         UNWIND $batch AS data
         MERGE (n:Artist {id: data.id})
         SET n.name = coalesce(data.name, n.name), 
+            n.aliases = coalesce(data.aliases, n.aliases),
+            n.disambiguation = coalesce(data.disambiguation, n.disambiguation),
             n.begin = coalesce(data.begin, n.begin), 
             n.end = coalesce(data.end, n.end), 
             n.ended = coalesce(data.ended, n.ended), 
@@ -267,7 +270,9 @@ with driver.session() as session:
     for index, dict_ in tqdm(iter_in_file("dumps/artist.tar.xz", "mbdump/artist"), total=2875751):
         life = dict_.get("life-span", {})
         entity_batches['artist'].append({
-            "name": dict_.get("name"), "id": dict_.get("id"),
+            "name": dict_.get("name"), "id": dict_.get("id"), 
+            "aliases": [alias["name"] for alias in dict_.get("aliases", [])],
+            "disambiguation": dict_.get("disambiguation"),
             "begin": life.get("begin"), "end": life.get("end"), "ended": life.get("ended")
         })
         flush_batches(session)
