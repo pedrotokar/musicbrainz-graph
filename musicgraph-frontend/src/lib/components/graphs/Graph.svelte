@@ -58,6 +58,38 @@
     let hoveredNode: SimulationNode | undefined = $state()
     let hoveredElement: SVGElement | undefined = $state()
 
+    let tooltipTimeout: ReturnType<typeof setTimeout> | undefined;
+
+    function handleNodeMouseEnter(event: MouseEvent, node: SimulationNode) {
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+            tooltipTimeout = undefined;
+        }
+        hoveredElement = event.currentTarget as SVGElement;
+        hoveredNode = node;
+    }
+
+    function handleNodeMouseLeave() {
+        tooltipTimeout = setTimeout(() => {
+            hoveredElement = undefined;
+            hoveredNode = undefined;
+        }, 250);
+    }
+
+    function handleTooltipMouseEnter() {
+        if (tooltipTimeout) {
+            clearTimeout(tooltipTimeout);
+            tooltipTimeout = undefined;
+        }
+    }
+
+    function handleTooltipMouseLeave() {
+        tooltipTimeout = setTimeout(() => {
+            hoveredElement = undefined;
+            hoveredNode = undefined;
+        }, 250);
+    }
+
     let width: number = 1280;
     let height: number = 720;
     let svgNode: SVGSVGElement | undefined = $state();
@@ -383,8 +415,8 @@
             <g transform="translate({node.x},{node.y})" 
                {@attach draggable(node)} 
                onclick={() => onNodeClick(node)} onkeydown={() => onNodeClick(node)} 
-               onmouseenter={(event) => {hoveredElement = event.currentTarget; hoveredNode = node}} 
-               onmouseleave={() => {hoveredElement = undefined; hoveredNode = undefined}}
+               onmouseenter={(event) => handleNodeMouseEnter(event, node)} 
+               onmouseleave={() => handleNodeMouseLeave()}
                role="button" tabindex="0"
                >
                 <!-- <circle r="20" fill="blue"/> -->
@@ -396,7 +428,10 @@
 </svg>
 
 {#if hoveredNode}
-<div id="tooltip" {@attach tooltipPosition}>
+<div id="tooltip" {@attach tooltipPosition}
+     onmouseenter={handleTooltipMouseEnter}
+     onmouseleave={handleTooltipMouseLeave}
+     role="tooltip">
     {@html getNodeTooltip(hoveredNode)}
 </div>
 {/if}
