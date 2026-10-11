@@ -1,11 +1,14 @@
 from .types import GraphResponse
 from .utils import normalize_edge, normalize_node
 
+import asyncio
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from neo4j import AsyncGraphDatabase, AsyncResult
+from neo4j.exceptions import ServiceUnavailable
 
 
 URI = "neo4j://localhost"
@@ -21,8 +24,21 @@ with open("app/queries/search_artists.cypher", "r") as f:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    timeout = 60
+    start_time = time.time()
     async with AsyncGraphDatabase.driver(URI, auth = AUTH) as driver:
-        await driver.verify_connectivity()
+        while True:
+            try:
+                await driver.verify_connectivity()
+                break
+            except (ServiceUnavailable, ConnectionResetError, OSError) as e:
+                if time.time() - start_time > timeout:
+                    print(f"Timeout de {timeout}s atingido. Falha ao conectar ao Neo4j.")
+                    raise e
+
+                print("Aguardando inicializacao do Neo4j. Retentando em 5 segundos...")
+                await asyncio.sleep(5)
+
         app.state.neo4j_driver = driver
         yield
 
