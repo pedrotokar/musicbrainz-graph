@@ -55,12 +55,15 @@
 
     let simulationNodes: SimulationNode[] = $state([])
     let simulationEdges: SimulationEdge[] = $state([])
+
+
+    // --------- Common functions to all hovering dependent features ---------
+
     let hoveredNode: SimulationNode | undefined = $state()
     let hoveredElement: SVGElement | undefined = $state()
-
     let tooltipTimeout: ReturnType<typeof setTimeout> | undefined;
 
-    function handleNodeMouseEnter(event: MouseEvent, node: SimulationNode) {
+        function handleNodeMouseEnter(event: MouseEvent, node: SimulationNode) {
         if (tooltipTimeout) {
             clearTimeout(tooltipTimeout);
             tooltipTimeout = undefined;
@@ -269,6 +272,28 @@
         }
     }
 
+    // --------------------- Implementing mouse highlight ---------------------
+
+    let adjacentNodeIds = $derived.by(() => {
+        if (!hoveredNode) return new Set<string>();
+
+        // eslint-disable-next-line svelte/prefer-svelte-reactivity
+        const ids = new Set<string>();
+        for (const edge of simulationEdges) {
+            if (edge.source.id === hoveredNode.id && edge.target.id !== hoveredNode.id) {
+                ids.add(edge.target.id);
+            } else if (edge.target.id === hoveredNode.id && edge.source.id !== hoveredNode.id){
+                ids.add(edge.source.id);
+            }
+        }
+        return ids;
+    });
+
+    function isConnectedEdge(edge: SimulationEdge, hovered: SimulationNode | undefined): boolean {
+        if (!hovered) return false;
+        if (edge.source.id === hovered.id && edge.target.id === hovered.id) return false;
+        return edge.source.id === hovered.id || edge.target.id === hovered.id;
+    }
 
     // ---------------------- Implementing color legend ----------------------
     //Used to implement the node coloring feature
@@ -404,6 +429,7 @@
     <g stroke="#999" stroke-width="1.5" class="edges" transform="translate({zoomAppliedTransform.x}, {zoomAppliedTransform.y}) scale({zoomAppliedTransform.k})">
         {#each simulationEdges as edge (edge.source.id + "->" + edge.target.id + "|" + edge.type)}
             <line class="edge {edge.type}"
+                class:highlighted={isConnectedEdge(edge, hoveredNode)}
                 //marker-end="url(#arrowhead-{edge.type})"
                 x1={edge.source.x} y1={edge.source.y}
                 x2={edge.target.x} y2={edge.target.y}/>
@@ -413,6 +439,9 @@
         {#each simulationNodes as node (node.id)}
             <!-- <g transform="translate({node.x},{node.y})" on:click={() => {addNodeRelations(node.id); simulation.nodes(nodes); simulation.force("link").links(edges); simulation.alpha(1).restart();}}> -->
             <g transform="translate({node.x},{node.y})" 
+               class="node"
+               class:hovered={hoveredNode?.id === node.id}
+               class:adjacent={adjacentNodeIds.has(node.id)}
                {@attach draggable(node)} 
                onclick={() => onNodeClick(node)} onkeydown={() => onNodeClick(node)} 
                onmouseenter={(event) => handleNodeMouseEnter(event, node)} 
@@ -448,5 +477,38 @@
         position: absolute;
         top: 0;
         left: 0;
+    }
+
+    .edge, .node circle, .node text {
+        transition: stroke 0.15s ease, stroke-width 0.15s ease, r 0.15s ease;
+    }
+
+    /* Highlighted Edges */
+    .edge.highlighted {
+        stroke: #1e293b;
+        stroke-width: 3px;
+    }
+
+    /* Hovered Node */
+    .node.hovered circle {
+        stroke: #0f172a;
+        stroke-width: 3.5px;
+        r: 23px;
+    }
+
+    .node.hovered text {
+        font-weight: bold;
+        font-size: 11px;
+    }
+
+    /* Adjacent Nodes */
+    .node.adjacent circle {
+        stroke: #1e293b;
+        stroke-width: 2.5px;
+        stroke-dasharray: 4 2;
+    }
+
+    .node.adjacent text {
+        font-weight: 600;
     }
 </style>
