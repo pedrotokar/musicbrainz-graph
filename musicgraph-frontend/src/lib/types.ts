@@ -67,3 +67,10 @@ export type FilterState = Record<string,
     | { bidirectional: true; show: boolean }
     | { bidirectional: false; showForward: boolean; showBackward: boolean }
 >;
+
+//Search types
+export interface SearchResult {
+    id: string;
+    name: string;
+    score: number;
+}

@@ -67,8 +67,8 @@ async def search_artists(
 
     records, _, _ = await driver.execute_query(
         search_artists_query,
-        query=query_param,
-        database_=DATABASE_NAME,
+        query = query_param,
+        database_ = DATABASE_NAME,
     )
 
     results = []
@@ -76,7 +76,7 @@ async def search_artists(
         results.append({
             "id": record["id"],
             "name": record["name"],
-            "score": record["finalScore"]
+            "score": record["finalScore"],
         })
 
     return results

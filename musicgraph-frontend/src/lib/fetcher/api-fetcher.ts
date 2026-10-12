@@ -1,4 +1,4 @@
-import type { GenericAPIResponse } from '$lib/types';
+import type { GenericAPIResponse, SearchResult } from '$lib/types';
 export const URL_API = "http://127.0.0.1:8000";
 
 export async function getArtistAdjacentNodes(artistId: string) {
@@ -6,6 +6,17 @@ export async function getArtistAdjacentNodes(artistId: string) {
     const rawGraphData = await response.json() as GenericAPIResponse;
     console.log(rawGraphData);
     return rawGraphData;
+}
+
+export async function performArtistSearch(query: string, controller: AbortController) {
+    const params = new URLSearchParams({ q: query });
+    const response = await fetch(`${URL_API}/artist/search?${params.toString()}`, { signal: controller.signal });
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const rawSearchData = await response.json() as SearchResult[];
+    console.log(rawSearchData);
+    return rawSearchData;
 }
 //    return normalizeGraph(rawGraphData);
 
