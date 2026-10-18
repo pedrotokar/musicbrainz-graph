@@ -5,6 +5,7 @@
 
     //Svelte imports
     import { onMount } from "svelte";
+    import { SvelteSet } from "svelte/reactivity";
 
     //Type Imports
     import type { GraphNode, GraphEdge, FilterState, EdgeContext } from "$lib/types"
@@ -124,20 +125,46 @@
         }
     }
 
+    // ------------------ Implementing concurrent expansion ------------------
+    // Expansions don't block each other: each node being fetched is tracked in
+    // pendingNodeIds and their fetches are running in parallel. This code helps
+    // ensuring the camera only follows the latest interaction the user asked
+    // for, so a slow response that arrives late won't steal the focus
+    const pendingNodeIds = new SvelteSet<string>();
+    let lastFocusIntentId: string | undefined = undefined;
+    let focusTarget: { nodeId: string } | undefined = $state();
+
+    function requestFocus(nodeId: string | undefined){
+        if (nodeId) focusTarget = { nodeId };
+    }
+
     function selectInteraction(interaction: GraphInteraction){
         selectedInteraction = interaction;
+        // Explicit user choice: always becomes the latest intent
+        lastFocusIntentId = interaction.getFocusNodeId();
+        requestFocus(lastFocusIntentId);
     }
 
     //TODO: improve this, decide where the logic goes
     async function expandArtist(artistId: string) {
+        if (pendingNodeIds.has(artistId)) return; // already on its way
+        pendingNodeIds.add(artistId);
+        lastFocusIntentId = artistId;
         try {
             const newInteraction = await ExpandInteraction.create(artistId);
-            selectedInteraction = newInteraction;
-            if (!activeInteractions.some((interaction) => interaction.getId() == newInteraction.getId())) addInteraction(newInteraction);
+            if (!activeInteractions.some((interaction) => interaction.getId() == newInteraction.getId())) {
+                addInteraction(newInteraction);
+            }
+            // Only take over selection/camera if the user hasn't asked for something else meanwhile
+            if (lastFocusIntentId === artistId) {
+                selectedInteraction = newInteraction;
+                requestFocus(newInteraction.getFocusNodeId());
+            }
             // applyFilter();
         } catch (e) {
             console.error(e);
         } finally {
+            pendingNodeIds.delete(artistId);
             console.log("finished expanding");
         }
     }
@@ -247,7 +274,7 @@
 
 <RelationshipFilter activeFilters={activeFilters}/>
 
-<Graph nodes={filteredNodes} edges={filteredEdges} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction} activeFilters={activeFilters}/>
+<Graph nodes={filteredNodes} edges={filteredEdges} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction} activeFilters={activeFilters} pendingNodeIds={pendingNodeIds} focusTarget={focusTarget}/>
 
 <InteractionList activeInteractions={activeInteractions} removeInteractionCallback={removeInteraction} selectInteractionCallback={selectInteraction}/>
 

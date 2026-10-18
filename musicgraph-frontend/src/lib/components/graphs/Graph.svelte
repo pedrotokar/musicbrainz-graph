@@ -27,11 +27,10 @@
     svelte.
     */
 
-    //TODO: Improve clicking by having a loading state and by doing some other things idk
     //TODO: Improve node coloring and context handling in general (registry is a good option!)
 
     //Svelte and D3 imports
-    import { onMount, untrack } from "svelte";
+    import { onMount, tick, untrack } from "svelte";
     import { computePosition, flip, shift, offset, autoUpdate } from '@floating-ui/dom';
     import * as d3 from "d3";
 
@@ -49,9 +48,12 @@
         onClickCallbackFunction: (nodeId: string) => void;
         selectedInteraction: GraphInteraction | undefined;
         activeFilters: FilterState;
+        pendingNodeIds: Set<string>;
+        // Wrapped in an object so focusing the same node twice still triggers the effect
+        focusTarget: { nodeId: string } | undefined;
     }
 
-    let { nodes, edges, onClickCallbackFunction, selectedInteraction, activeFilters }: Props = $props();
+    let { nodes, edges, onClickCallbackFunction, selectedInteraction, activeFilters, pendingNodeIds, focusTarget }: Props = $props();
 
     let simulationNodes: SimulationNode[] = $state([])
     let simulationEdges: SimulationEdge[] = $state([])
@@ -186,18 +188,23 @@
 
     let zoomBehavior: ZoomBehavior<SVGSVGElement, unknown> = d3.zoom<SVGSVGElement, unknown>().on("zoom", onZoom);
 
-    // function zoomToNode(node: SimulationNode, scale = 1.2, duration = 750) {
-    //     if (!svgNode || node.x === undefined || node.y === undefined) return;
+    // Helper function used to implement the focus control feature. This function
+    // uses native d3 calls to send the zoom to a specific node
+    function zoomToNode(node: SimulationNode, scale?: number, duration = 750) {
+        if (!svgNode || node.x === undefined || node.y === undefined) return;
 
-    //     const targetTransform = d3.zoomIdentity
-    //         .translate(-node.x * scale, -node.y * scale)
-    //         .scale(scale);
+        // Keep the user's current zoom level unless a scale is given
+        const k = scale ?? d3.zoomTransform(svgNode).k;
 
-    //     d3.select<SVGSVGElement, unknown>(svgNode)
-    //         .transition()
-    //         .duration(duration)
-    //         .call(zoomBehavior.transform, targetTransform);
-    // }
+        const targetTransform = d3.zoomIdentity
+            .translate(-node.x * k, -node.y * k)
+            .scale(k);
+
+        d3.select<SVGSVGElement, unknown>(svgNode)
+            .transition()
+            .duration(duration)
+            .call(zoomBehavior.transform, targetTransform);
+    }
 
 
     // ------------------- Implementing the tooltip feature-------------------
@@ -425,6 +432,26 @@
         })
     })
 
+    // Moves the camera when the parent sends a new focus target. The parent
+    // controls which node will be focused and the component only reacts to it
+    $effect(() => {
+        const focusId = focusTarget?.nodeId;
+        if (!focusId || !svgNode) return;
+
+        untrack(() => {
+            const target = simulationNodes.find(n => n.id === focusId);
+            if (target && target.x !== undefined && target.y !== undefined) {
+                zoomToNode(target);
+            } else {
+                // Node was added in this same update: wait for the sync to happen
+                tick().then(() => {
+                    const freshTarget = simulationNodes.find(n => n.id === focusId);
+                    if (freshTarget) zoomToNode(freshTarget);
+                });
+            }
+        })
+    })
+
     onMount(() => {
         setupSimulation();
         syncSimulationGraph(nodes, edges)
@@ -455,6 +482,7 @@
                class="node"
                class:hovered={hoveredNode?.id === node.id}
                class:adjacent={adjacentNodeIds.has(node.id)}
+               class:loading={pendingNodeIds.has(node.id)}
                {@attach draggable(node)} 
                onclick={() => onNodeClick(node)} onkeydown={() => onNodeClick(node)} 
                onmouseenter={(event) => handleNodeMouseEnter(event, node)} 
@@ -523,5 +551,17 @@
 
     .node.adjacent text {
         font-weight: 600;
+    }
+
+    /* Nodes waiting for a backend expansion response */
+    @keyframes pulse-ring {
+        0%   { r: 20px; stroke-width: 2px; }
+        50%  { r: 25px; stroke-width: 4px; }
+        100% { r: 20px; stroke-width: 2px; }
+    }
+
+    .node.loading circle {
+        stroke: #f59e0b;
+        animation: pulse-ring 1.2s infinite ease-in-out;
     }
 </style>
