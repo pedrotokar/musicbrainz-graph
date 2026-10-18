@@ -95,8 +95,8 @@
         }, 250);
     }
 
-    let width: number = 1280;
-    let height: number = 720;
+    let innerWidth: number = $state(1280);
+    let innerHeight: number = $state(720);
     let svgNode: SVGSVGElement | undefined = $state();
 
     // ------------------ Implementing outside data merging ------------------
@@ -491,41 +491,44 @@
 
 </script>
 
-<svg id="ArtistGraphSVG"
-     width="{width}" height="{height}"
-     viewBox="{-width/2}, {-height/2}, {width}, {height}"
-     bind:this={svgNode}
->
-    <g stroke="#999" stroke-width="1.5" class="edges" transform="translate({zoomAppliedTransform.x}, {zoomAppliedTransform.y}) scale({zoomAppliedTransform.k})">
-        {#each simulationEdges as edge (edge.source.id + "->" + edge.target.id + "|" + edge.type)}
-            <line class="edge {edge.type}"
-                class:highlighted={isConnectedEdge(edge, hoveredNode)}
-                //marker-end="url(#arrowhead-{edge.type})"
-                x1={edge.source.x} y1={edge.source.y}
-                x2={edge.target.x} y2={edge.target.y}/>
-        {/each}
-    </g>
-    <g class="nodes" transform="translate({zoomAppliedTransform.x}, {zoomAppliedTransform.y}) scale({zoomAppliedTransform.k})">
-        {#each simulationNodes as node (node.id)}
-            <!-- <g transform="translate({node.x},{node.y})" on:click={() => {addNodeRelations(node.id); simulation.nodes(nodes); simulation.force("link").links(edges); simulation.alpha(1).restart();}}> -->
-            <g transform="translate({node.x},{node.y})" 
-               class="node"
-               class:hovered={hoveredNode?.id === node.id}
-               class:adjacent={adjacentNodeIds.has(node.id)}
-               class:loading={pendingNodeIds.has(node.id)}
-               {@attach draggable(node)} 
-               onclick={() => onNodeClick(node)} onkeydown={() => onNodeClick(node)} 
-               onmouseenter={(event) => handleNodeMouseEnter(event, node)} 
-               onmouseleave={() => handleNodeMouseLeave()}
-               role="button" tabindex="0"
-               >
-                <!-- <circle r="20" fill="blue"/> -->
-                <circle r="20" fill={getNodeColor(node)}/>
-                <text dy="0.35em" text-anchor="middle" dominant-baseline="middle" font-size="10px">{node.display_name}</text> 
-            </g>
-        {/each}
-    </g>
-</svg>
+
+<div class = "graph-svg-wrapper" bind:clientWidth={innerWidth} bind:clientHeight={innerHeight}>
+    <svg id="ArtistGraphSVG"
+         width="{innerWidth}" height="{innerHeight}"
+         viewBox="{-innerWidth/2}, {-innerHeight/2}, {innerWidth}, {innerHeight}"
+         bind:this={svgNode}
+    >
+        <g stroke="#999" stroke-width="1.5" class="edges" transform="translate({zoomAppliedTransform.x}, {zoomAppliedTransform.y}) scale({zoomAppliedTransform.k})">
+            {#each simulationEdges as edge (edge.source.id + "->" + edge.target.id + "|" + edge.type)}
+                <line class="edge {edge.type}"
+                    class:highlighted={isConnectedEdge(edge, hoveredNode)}
+                    //marker-end="url(#arrowhead-{edge.type})"
+                    x1={edge.source.x} y1={edge.source.y}
+                    x2={edge.target.x} y2={edge.target.y}/>
+            {/each}
+        </g>
+        <g class="nodes" transform="translate({zoomAppliedTransform.x}, {zoomAppliedTransform.y}) scale({zoomAppliedTransform.k})">
+            {#each simulationNodes as node (node.id)}
+                <!-- <g transform="translate({node.x},{node.y})" on:click={() => {addNodeRelations(node.id); simulation.nodes(nodes); simulation.force("link").links(edges); simulation.alpha(1).restart();}}> -->
+                <g transform="translate({node.x},{node.y})" 
+                   class="node"
+                   class:hovered={hoveredNode?.id === node.id}
+                   class:adjacent={adjacentNodeIds.has(node.id)}
+                   class:loading={pendingNodeIds.has(node.id)}
+                   {@attach draggable(node)} 
+                   onclick={() => onNodeClick(node)} onkeydown={() => onNodeClick(node)} 
+                   onmouseenter={(event) => handleNodeMouseEnter(event, node)} 
+                   onmouseleave={() => handleNodeMouseLeave()}
+                   role="button" tabindex="0"
+                   >
+                    <!-- <circle r="20" fill="blue"/> -->
+                    <circle r="20" fill={getNodeColor(node)}/>
+                    <text dy="0.35em" text-anchor="middle" dominant-baseline="middle" font-size="10px">{node.display_name}</text> 
+                </g>
+            {/each}
+        </g>
+    </svg>
+</div>
 
 {#if hoveredNode}
 <div id="tooltip" {@attach tooltipPosition}
@@ -537,10 +540,9 @@
 {/if}
 
 <style>
-    #ArtistGraphSVG {
-        border-style: solid;
-        border-radius: 4px;
-        border-color: purple;
+    .graph-svg-wrapper {
+        width: 100%;
+        height: 100%
     }
 
     #tooltip {

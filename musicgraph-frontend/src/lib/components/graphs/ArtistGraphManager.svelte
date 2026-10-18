@@ -271,13 +271,26 @@
 
 </script>
 
-<ArtistSearch onArtistSelectFunction={expandArtist}/>
-
-<RelationshipFilter activeFilters={activeFilters}/>
-
-<Graph nodes={filteredNodes} edges={filteredEdges} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction} activeFilters={activeFilters} pendingNodeIds={pendingNodeIds} focusTarget={focusTarget}/>
-
-<InteractionList activeInteractions={activeInteractions} removeInteractionCallback={removeInteraction} selectInteractionCallback={selectInteraction}/>
+<div class="graph-layout">
+    <div class="graph-canvas">
+        <Graph nodes={filteredNodes} edges={filteredEdges} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction} activeFilters={activeFilters} pendingNodeIds={pendingNodeIds} focusTarget={focusTarget}/>
+    </div>
+    
+    <div class="hud-overlay">
+        <div class="hud-panel color-legend-filter">
+            <RelationshipFilter activeFilters={activeFilters}/>
+        </div>
+        
+        <div class="hud-panel interaction-list">
+            <InteractionList activeInteractions={activeInteractions} selectedInteraction={selectedInteraction} removeInteractionCallback={removeInteraction} selectInteractionCallback={selectInteraction}/>
+        </div>
+        
+        <div class="hud-panel search-bar">
+            <ArtistSearch onArtistSelectFunction={expandArtist}/>
+        </div>
+        
+    </div>
+</div>
 
 
 <!-- {#each nodes as node (node.id)}    
@@ -295,5 +308,56 @@
 
 
 <style>
+.graph-layout {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.graph-canvas {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
+}
+
+.hud-overlay {
+    position: absolute;
+    z-index: 10;
+    inset: 0;
+    pointer-events: none;
+}
+
+.hud-panel {
+    position: absolute;
+    pointer-events: auto;
+    background: #feffc0;
+
+    backdrop-filter: blur(8px);
+    border-radius: 8px;
+    box-shadow: 0 4px 12px #00000052;
+    border: 1px solid #000000;
+}
+
+.search-bar {
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 300px;
+}
+
+.interaction-list {
+    bottom: 20px;
+    left: 30px;
+    width: 450px;
+
+    max-height: calc(100% - 120px);
+    overflow-y: auto;
+}
+
+.color-legend-filter {
+    top: 20px;
+    left: 20px;
+}
 
 </style>

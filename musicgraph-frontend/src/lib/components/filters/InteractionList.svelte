@@ -6,10 +6,11 @@
 
 	interface Props {
         activeInteractions: GraphInteraction[];
+		selectedInteraction: GraphInteraction | undefined;
         removeInteractionCallback: (interactionId: string) => void;
         selectInteractionCallback: (interaction: GraphInteraction) => void;
     }
-    let { activeInteractions, removeInteractionCallback, selectInteractionCallback }: Props = $props();
+    let { activeInteractions, selectedInteraction, removeInteractionCallback, selectInteractionCallback }: Props = $props();
 </script>
 
 <div class="container">
@@ -18,9 +19,9 @@
 		{#each activeInteractions as interaction, index (interaction.getId())}
 			<div
 				class="expand-interaction-wrapper" role="button" tabindex="0"
-				// class:selected={selectedNode
-				// 	? node.id === selectedNode.id
-				// 	: false}
+				class:selected={selectedInteraction
+				 ? interaction.getId() === selectedInteraction.getId()
+				 : false}
 				onclick={() => selectInteractionCallback(interaction)} onkeydown={() => selectInteractionCallback(interaction)}
 			>
 				<div class="expand-interaction-text" class:hid={index > 4}>
@@ -59,19 +60,14 @@
 		/* transform: translateX(-50%); */
 		z-index: 1000;
 
-		/* background-color: var(--accent-black); */
-		/* border-radius: 8px; */
-		/* border: 2px solid rgba(100, 100, 100, 0.6); */
-		/**/
-		/* padding: 10px; */
+		/* background-color: #f8cdeb; */
+		/* border-radius: 8px;
+		border: 2px solid rgba(100, 100, 100, 0.6);
+		padding: 10px; */
 		/* box-shadow: 0 0px 5px rgba(256, 256, 256, 0.25); */
 		/* width: 90%; */
 		max-width: 400px;
 		box-sizing: border-box;
-	}
-
-	* {
-		color: white;
 	}
 
 	#artist-container {
@@ -102,7 +98,7 @@
 	}
 
 	.expand-interaction-wrapper.selected .expand-interaction-text {
-		color: black;
+		color: black !important;
 		font-weight: bold;
 	}
 
@@ -119,6 +115,7 @@
 	#artist-container .expand-interaction-text {
 		padding: 0 3px 0 1ch;
 		font-size: 85%;
+		color: white;
 	}
 
 	#artist-container .remove-button {
