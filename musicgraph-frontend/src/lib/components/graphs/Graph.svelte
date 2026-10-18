@@ -186,6 +186,19 @@
 
     let zoomBehavior: ZoomBehavior<SVGSVGElement, unknown> = d3.zoom<SVGSVGElement, unknown>().on("zoom", onZoom);
 
+    // function zoomToNode(node: SimulationNode, scale = 1.2, duration = 750) {
+    //     if (!svgNode || node.x === undefined || node.y === undefined) return;
+
+    //     const targetTransform = d3.zoomIdentity
+    //         .translate(-node.x * scale, -node.y * scale)
+    //         .scale(scale);
+
+    //     d3.select<SVGSVGElement, unknown>(svgNode)
+    //         .transition()
+    //         .duration(duration)
+    //         .call(zoomBehavior.transform, targetTransform);
+    // }
+
 
     // ------------------- Implementing the tooltip feature-------------------
     

@@ -96,6 +96,7 @@ if __name__ == "__main__":
                     components[restarted_component][0],
                     components[restarted_component][1],
                     components[restarted_component][2],
+                    components[restarted_component][3],
                 )
             else:
                 print("Invalid input. Try again.")

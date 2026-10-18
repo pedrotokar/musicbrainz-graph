@@ -10,6 +10,8 @@ export abstract class GraphInteraction {
         return this.id;
     }
 
+    // Returns the ID of the node that the canvas should focus on, if any
+    abstract getFocusNodeId(): string | undefined;
     //Get the text that is shown to the user to refer to the interaction
     abstract getShowText(): string;
 

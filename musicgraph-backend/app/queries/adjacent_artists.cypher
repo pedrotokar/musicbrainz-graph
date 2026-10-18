@@ -59,7 +59,8 @@ CALL (id) {
     MATCH (sourceArtist:Artist {id: id})
     MATCH (sourceArtist)-[cred:CREDITED_IN]->(rec:Recording)<-[cred2:CREDITED_IN]-(artist:Artist)
     MATCH (rec)-[cont:IS_CONTAINED_ON]->(rel:Release)
-    WITH sourceArtist, COLLECT([rec.id, rec.title]) AS collaboration_recordings, MIN(rel.release_date) AS first_collaboration_date, artist
+    WITH sourceArtist, rec, artist, MIN(rel.release_date) AS first_recording_release_date
+    WITH sourceArtist, COLLECT([rec.id, rec.title]) AS collaboration_recordings, MIN(first_recording_release_date) AS first_collaboration_date, artist
     CALL apoc.create.vRelationship(sourceArtist,'COLLABORATED_WITH', {collaboration_recordings: collaboration_recordings, start_date: first_collaboration_date}, artist) YIELD rel AS vRelationship
     RETURN sourceArtist, vRelationship, artist
 

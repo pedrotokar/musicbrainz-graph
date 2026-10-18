@@ -50,6 +50,10 @@ export class ExpandInteraction extends GraphInteraction {
         return this.originNodeName;
     }
 
+    getFocusNodeId(): string | undefined {
+        return this.originNodeId;
+    }
+
     getNodeContext(node: GraphNode): NodeContext {
         if (node.id === this.originNodeId) {
             return { 
