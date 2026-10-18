@@ -50,7 +50,7 @@
         activeFilters: FilterState;
         pendingNodeIds: Set<string>;
         // Wrapped in an object so focusing the same node twice still triggers the effect
-        focusTarget: { nodeId: string } | undefined;
+        focusTarget: { nodeId: string, scale: number | undefined } | undefined;
     }
 
     let { nodes, edges, onClickCallbackFunction, selectedInteraction, activeFilters, pendingNodeIds, focusTarget }: Props = $props();
@@ -179,6 +179,8 @@
     // Used to implement the zooming feature. D3 only helps giving the
     // information on how I should update the svg, and not in updating it
     let zoomAppliedTransform: {x: number, y: number, k: number} = $state({x: 0, y: 0, k: 1})
+    const MIN_ZOOM = 0.2
+    const MAX_ZOOM = 3.5
 
     function onZoom(event: D3ZoomEvent<SVGSVGElement, unknown>){
         zoomAppliedTransform.x = event.transform.x;
@@ -186,7 +188,9 @@
         zoomAppliedTransform.k = event.transform.k;
     }
 
-    let zoomBehavior: ZoomBehavior<SVGSVGElement, unknown> = d3.zoom<SVGSVGElement, unknown>().on("zoom", onZoom);
+    let zoomBehavior: ZoomBehavior<SVGSVGElement, unknown> = d3.zoom<SVGSVGElement, unknown>()
+        .scaleExtent([MIN_ZOOM, MAX_ZOOM])
+        .on("zoom", onZoom);
 
     // Helper function used to implement the focus control feature. This function
     // uses native d3 calls to send the zoom to a specific node
@@ -194,7 +198,10 @@
         if (!svgNode || node.x === undefined || node.y === undefined) return;
 
         // Keep the user's current zoom level unless a scale is given
-        const k = scale ?? d3.zoomTransform(svgNode).k;
+        const targetScale = scale ?? d3.zoomTransform(svgNode).k;
+        const k = Math.min(Math.max(targetScale, MIN_ZOOM), MAX_ZOOM);
+        console.log(targetScale);
+        console.log(k);
 
         const targetTransform = d3.zoomIdentity
             .translate(-node.x * k, -node.y * k)
@@ -408,7 +415,7 @@
             simulation.nodes(simulationNodes);
             const linkForce = simulation.force("link") as d3.ForceLink<SimulationNode, SimulationEdge>
             linkForce!.links(simulationEdges);
-            simulation.alpha(1).restart();
+            simulation.alpha(0.4).restart();
             
             console.log("Updated Graph simulation with synced nodes");
 //            setTimeout(() => {simulation.stop()}, 5000)
@@ -440,15 +447,17 @@
 
         untrack(() => {
             const target = simulationNodes.find(n => n.id === focusId);
-            if (target && target.x !== undefined && target.y !== undefined) {
-                zoomToNode(target);
-            } else {
-                // Node was added in this same update: wait for the sync to happen
-                tick().then(() => {
-                    const freshTarget = simulationNodes.find(n => n.id === focusId);
-                    if (freshTarget) zoomToNode(freshTarget);
-                });
-            }
+            setTimeout(() => {
+                if (target && target.x !== undefined && target.y !== undefined) {
+                    zoomToNode(target, focusTarget.scale);
+                } else {
+                    // Node was added in this same update: wait for the sync to happen
+                    tick().then(() => {
+                        const freshTarget = simulationNodes.find(n => n.id === focusId);
+                        if (freshTarget) zoomToNode(freshTarget, focusTarget.scale);
+                    });
+                }
+            }, 500)
         })
     })
 

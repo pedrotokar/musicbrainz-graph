@@ -132,10 +132,10 @@
     // for, so a slow response that arrives late won't steal the focus
     const pendingNodeIds = new SvelteSet<string>();
     let lastFocusIntentId: string | undefined = undefined;
-    let focusTarget: { nodeId: string } | undefined = $state();
+    let focusTarget: { nodeId: string, scale: number | undefined } | undefined = $state();
 
-    function requestFocus(nodeId: string | undefined){
-        if (nodeId) focusTarget = { nodeId };
+    function requestFocus(nodeId: string | undefined, scale?: number | undefined){
+        if (nodeId) focusTarget = { nodeId, scale };
     }
 
     function selectInteraction(interaction: GraphInteraction){
@@ -158,7 +158,7 @@
             // Only take over selection/camera if the user hasn't asked for something else meanwhile
             if (lastFocusIntentId === artistId) {
                 selectedInteraction = newInteraction;
-                requestFocus(newInteraction.getFocusNodeId());
+                requestFocus(newInteraction.getFocusNodeId(), 1);
             }
             // applyFilter();
         } catch (e) {
@@ -265,6 +265,7 @@
     // $inspect("Loaded nodes and edges were updated: ", nodes, edges);
     // $inspect("graphChangesCounter", graphChangesCounter);
     // $inspect("Active filters", activeFilters);
+    $inspect("Focus target", focusTarget);
 
     
 
