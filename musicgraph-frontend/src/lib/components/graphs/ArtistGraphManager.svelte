@@ -265,7 +265,7 @@
     // $inspect("Loaded nodes and edges were updated: ", nodes, edges);
     // $inspect("graphChangesCounter", graphChangesCounter);
     // $inspect("Active filters", activeFilters);
-    $inspect("Focus target", focusTarget);
+    // $inspect("Focus target", focusTarget);
 
     
 

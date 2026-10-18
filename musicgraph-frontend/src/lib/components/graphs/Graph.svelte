@@ -30,7 +30,7 @@
     //TODO: Improve node coloring and context handling in general (registry is a good option!)
 
     //Svelte and D3 imports
-    import { onMount, tick, untrack } from "svelte";
+    import { onMount, untrack } from "svelte";
     import { computePosition, flip, shift, offset, autoUpdate } from '@floating-ui/dom';
     import * as d3 from "d3";
 
@@ -417,6 +417,10 @@
             linkForce!.links(simulationEdges);
             simulation.alpha(0.4).restart();
             
+            // for (let i = 0; i < 20; i++){
+            //     simulation.tick();
+            // }
+        
             console.log("Updated Graph simulation with synced nodes");
 //            setTimeout(() => {simulation.stop()}, 5000)
         } else {
@@ -440,24 +444,41 @@
     })
 
     // Moves the camera when the parent sends a new focus target. The parent
-    // controls which node will be focused and the component only reacts to it
+    // controls which node will be focused and the component only reacts to it.
+    // Since sometimes the focus was being applied when the simulation was still
+    // too warm, it checks if the simulation is warm before applying it. if it
+    // is, then it waits for 60 simulation ticks before settling anything. 
+    // future logic idea: I can inside the tick check the simulation alpha
+    // instead of choosing a random tick number and sticking with it like
+    // I do now
     $effect(() => {
+        console.log("Focus effect on graph component was called", focusTarget);
+        if(!simulation){
+            return;
+        }
+
         const focusId = focusTarget?.nodeId;
         if (!focusId || !svgNode) return;
 
         untrack(() => {
-            const target = simulationNodes.find(n => n.id === focusId);
-            setTimeout(() => {
-                if (target && target.x !== undefined && target.y !== undefined) {
-                    zoomToNode(target, focusTarget.scale);
-                } else {
-                    // Node was added in this same update: wait for the sync to happen
-                    tick().then(() => {
-                        const freshTarget = simulationNodes.find(n => n.id === focusId);
-                        if (freshTarget) zoomToNode(freshTarget, focusTarget.scale);
-                    });
-                }
-            }, 500)
+            if(simulation.alpha() < 0.05){
+                const target = simulationNodes.find(n => n.id === focusId);
+                if(target) zoomToNode(target, focusTarget.scale);
+            }
+            else {
+                let ticks = 0;
+                simulation.on("tick.focus", null);
+                simulation.on("tick.focus", () => {
+                    ticks++;
+                    if (ticks >= 60) {
+                        simulation.on("tick.focus", null);
+                        const target = simulationNodes.find(n => n.id === focusId);
+                        if (target && target.x !== undefined && target.y !== undefined) {
+                            zoomToNode(target, focusTarget.scale);
+                        }
+                    }
+                })
+            }
         })
     })
 
