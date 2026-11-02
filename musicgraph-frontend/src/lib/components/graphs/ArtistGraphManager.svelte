@@ -341,7 +341,7 @@
 
 .search-bar {
     top: 20px;
-    left: 50%;
+    left: 90%;
     transform: translateX(-50%);
     width: 300px;
 }

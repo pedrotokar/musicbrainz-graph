@@ -72,5 +72,6 @@ export type FilterState = Record<string,
 export interface SearchResult {
     id: string;
     name: string;
+    disambiguation: string | null;
     score: number;
 }

@@ -76,6 +76,7 @@ async def search_artists(
         results.append({
             "id": record["id"],
             "name": record["name"],
+            "disambiguation": record["disambiguation"],
             "score": record["finalScore"],
         })
 

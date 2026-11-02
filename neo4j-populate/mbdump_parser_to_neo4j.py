@@ -232,11 +232,11 @@ def flush_batches(session, force=False):
         for relationship, batch in relationship_batches.items():
             session.execute_write(get_batch_insert_function(relationship_queries[relationship]), batch)
 
-        for key in entity_batches:
-            entity_batches[key].clear()
+        for batch in entity_batches.items():
+            batch.clear()
 
-        for key in relationship_batches:
-            relationship_batches[key].clear()
+        for batch in relationship_batches.items():
+            batch.clear()
 
 
 # ==========================================

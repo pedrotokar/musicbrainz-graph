@@ -200,8 +200,6 @@
         // Keep the user's current zoom level unless a scale is given
         const targetScale = scale ?? d3.zoomTransform(svgNode).k;
         const k = Math.min(Math.max(targetScale, MIN_ZOOM), MAX_ZOOM);
-        console.log(targetScale);
-        console.log(k);
 
         const targetTransform = d3.zoomIdentity
             .translate(-node.x * k, -node.y * k)

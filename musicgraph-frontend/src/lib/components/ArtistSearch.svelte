@@ -133,7 +133,7 @@
             onclick={() => selectArtist(result)}
             onmouseenter={() => { selectedIndex = index; }}
         >
-            {result.name} ({result.id}) ({result.score})
+            {result.name}{result.disambiguation ? ` — ${result.disambiguation}` : ''} ({result.id}) ({result.score})
         </li>
         {/each}
     </ul>
