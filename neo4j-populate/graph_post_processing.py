@@ -1,10 +1,5 @@
-from collections import defaultdict
 from datetime import datetime
-import json
-from os.path import isfile
-import subprocess
-import sys
-import tarfile
+from pathlib import Path
 
 from neo4j import GraphDatabase
 from tqdm import tqdm
@@ -69,3 +64,33 @@ DETACH DELETE a
 driver.execute_query(clear_dull_artists_query)
 
 print("Limpeza da base do Neo4j realizada com sucesso!")
+
+# Materialização das relações inferidas (INF_*)
+# As queries ficam em postprocess/*.cypher e rodam em ordem alfabética do nome do arquivo.
+# Usa session.run (transação implícita), necessário para CALL { } IN TRANSACTIONS.
+
+INF_RELATIONSHIP_TYPES = [
+    "INF_HAS_MUSICAL_CONNECTION_TO",
+    "INF_HAS_PERSONAL_CONNECTION_TO",
+    "INF_COLLABORATED_WITH",
+    "INF_COVERED",
+    "INF_PRODUCED",
+]
+
+POSTPROCESS_DIR = Path(__file__).parent / "postprocess"
+
+with driver.session() as session:
+    # Removendo arestas criadas anteriormente para não duplicar (idempotência)
+    for rel_type in tqdm(INF_RELATIONSHIP_TYPES):
+        session.run(
+            f"MATCH ()-[r:{rel_type}]->() "
+            "CALL (r) { DELETE r } IN TRANSACTIONS OF 10000 ROWS"
+        ).consume()
+    print("Arestas inferidas antigas removidas!")
+
+    for query_file in tqdm(sorted(POSTPROCESS_DIR.glob("*.cypher"))):
+        print(f"Executando {query_file.name}...")
+        summary = session.run(query_file.read_text()).consume()
+        print(f"{summary.counters.relationships_created} relacionamentos materializados.")
+
+print("Materialização das relações inferidas concluída!")
