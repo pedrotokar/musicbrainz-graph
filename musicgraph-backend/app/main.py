@@ -21,6 +21,8 @@ with open("app/queries/adjacent_artists.cypher", "r") as f:
 with open("app/queries/search_artists.cypher", "r") as f:
     search_artists_query = f.read()
 
+with open("app/queries/shortest_path.cypher", "r") as f:
+    shortest_path_query = f.read()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -124,6 +126,43 @@ async def get_near_artists(
                 record["end_id"]
             )
         )
+
+    return {
+        "nodes": nodes,
+        "edges": edges
+    }
+
+@app.get("/artist/{source_artist_id}/shortest/{target_artist_id}")
+async def get_shortest_path(
+    source_artist_id: str,
+    target_artist_id: str,
+    request: Request
+) -> GraphResponse:
+    driver = request.app.state.neo4j_driver
+
+    path_record = await driver.execute_query(
+        shortest_path_query,
+        idSource = source_artist_id,
+        idTarget = target_artist_id,
+        database_ = DATABASE_NAME,
+        result_transformer_ = AsyncResult.single,
+    )
+
+    nodes = []
+    edges = []
+
+    for artist in path_record["artists"]:
+        nodes.append(normalize_node(artist))
+    
+    for relationship in path_record["relationships"]:
+        edge = normalize_edge(
+            relationship,
+            relationship.start_node.get("id"),
+            relationship.end_node.get("id")
+        )
+        edge["type"] = edge["type"].replace("INF_", "")
+        edges.append(edge)
+
 
     return {
         "nodes": nodes,

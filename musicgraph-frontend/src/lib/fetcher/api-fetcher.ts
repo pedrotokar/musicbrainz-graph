@@ -18,6 +18,13 @@ export async function performArtistSearch(query: string, controller: AbortContro
     console.log(rawSearchData);
     return rawSearchData;
 }
+
+export async function getArtistShortestPath(sourceArtistId: string, targetArtistId: string) {
+    const response = await fetch(`${URL_API}/artist/${sourceArtistId}/shortest/${targetArtistId}`);
+    const rawGraphData = await response.json() as GenericAPIResponse;
+    console.log(rawGraphData);
+    return rawGraphData;
+}
 //    return normalizeGraph(rawGraphData);
 
 // function normalizeGraph(rawGraphData: any) {

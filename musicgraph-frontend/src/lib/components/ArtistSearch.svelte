@@ -126,6 +126,7 @@
 <div id="artistSearchResults">
     <ul role="listbox">
         {#each searchResults as result, index (result.id)}
+        <!-- svelte-ignore a11y_click_events_have_key_events --> <!-- it has, its just not there -->
         <li 
             role="option"
             aria-selected={index === selectedIndex}
