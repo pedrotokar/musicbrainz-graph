@@ -5,7 +5,7 @@ import asyncio
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from neo4j import AsyncGraphDatabase, AsyncResult
 from neo4j.exceptions import ServiceUnavailable
@@ -35,10 +35,10 @@ async def lifespan(app: FastAPI):
                 break
             except (ServiceUnavailable, ConnectionResetError, OSError) as e:
                 if time.time() - start_time > timeout:
-                    print(f"Timeout de {timeout}s atingido. Falha ao conectar ao Neo4j.")
+                    print(f"Timeout of {timeout}s reached. Failed to connect to Neo4j.")
                     raise e
 
-                print("Aguardando inicializacao do Neo4j. Retentando em 5 segundos...")
+                print("Waiting for Neo4j initialization. Retrying in 5 seconds...")
                 await asyncio.sleep(5)
 
         app.state.neo4j_driver = driver
@@ -48,7 +48,7 @@ app = FastAPI(lifespan = lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Na fase de testes locais, pode usar "*" para liberar tudo
+    allow_origins=["*"], # In local testing phase, "*" can be used to allow all
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -138,6 +138,12 @@ async def get_shortest_path(
     target_artist_id: str,
     request: Request
 ) -> PathResponse:
+    if source_artist_id == target_artist_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Source and target must be different artists"
+        )
+
     driver = request.app.state.neo4j_driver
 
     path_record = await driver.execute_query(
@@ -147,6 +153,12 @@ async def get_shortest_path(
         database_ = DATABASE_NAME,
         result_transformer_ = AsyncResult.single,
     )
+
+    if path_record is None:
+        raise HTTPException(
+            status_code=404,
+            detail="No path found between the artists within 10 hops"
+        )
 
     nodes = []
     edges = []

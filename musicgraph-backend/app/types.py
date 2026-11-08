@@ -2,14 +2,14 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-# --- MODELO DOS NÓS ---
+# --- NODE MODEL ---
 class NodeModel(BaseModel):
     id: str
     labels: list[str] # ex: "Artist", "Band"
     display_name: str
     parameters: dict[str, Any] = Field(default_factory=dict)
 
-# --- MODELO DAS ARESTAS (RELAÇÕES) ---
+# --- EDGE MODEL (RELATIONSHIPS) ---
 class EdgeModel(BaseModel):
     source: str
     target: str
@@ -17,12 +17,12 @@ class EdgeModel(BaseModel):
 
     parameters: dict[str, Any] = Field(default_factory=dict)
 
-# --- RESPOSTA FINAL DA API ---
+# --- FINAL API RESPONSE ---
 class GraphResponse(BaseModel):
     nodes: list[NodeModel]
     edges: list[EdgeModel]
 
-# --- RESPOSTA DO CAMINHO MAIS CURTO ---
+# --- SHORTEST PATH RESPONSE ---
 class PathResponse(GraphResponse):
     source: str
     target: str

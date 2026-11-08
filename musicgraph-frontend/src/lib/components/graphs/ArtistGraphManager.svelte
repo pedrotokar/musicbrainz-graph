@@ -164,7 +164,7 @@
             }
             // applyFilter();
         } catch (e) {
-            console.error(e);
+            console.warn("Path interaction failed:", e instanceof Error ? e.message : e);
         } finally {
             pendingNodeIds.delete(artistId);
             console.log("finished expanding");

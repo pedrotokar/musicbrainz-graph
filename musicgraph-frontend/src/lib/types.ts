@@ -23,6 +23,12 @@ export interface GenericAPIResponse {
     edges: GraphEdge[];
 }
 
+export interface PathAPIResponse extends GenericAPIResponse {
+    source: string;
+    target: string;
+    path: string[];
+}
+
 export interface InteractionOwnedElements {
     nodes: string[];
     edges: string[];
