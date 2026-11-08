@@ -21,3 +21,9 @@ class EdgeModel(BaseModel):
 class GraphResponse(BaseModel):
     nodes: list[NodeModel]
     edges: list[EdgeModel]
+
+# --- RESPOSTA DO CAMINHO MAIS CURTO ---
+class PathResponse(GraphResponse):
+    source: str
+    target: str
+    path: list[str]

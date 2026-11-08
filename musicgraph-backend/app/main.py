@@ -1,4 +1,4 @@
-from .types import GraphResponse
+from .types import GraphResponse, PathResponse
 from .utils import normalize_edge, normalize_node
 
 import asyncio
@@ -137,7 +137,7 @@ async def get_shortest_path(
     source_artist_id: str,
     target_artist_id: str,
     request: Request
-) -> GraphResponse:
+) -> PathResponse:
     driver = request.app.state.neo4j_driver
 
     path_record = await driver.execute_query(
@@ -154,17 +154,20 @@ async def get_shortest_path(
     for artist in path_record["artists"]:
         nodes.append(normalize_node(artist))
     
-    for relationship in path_record["relationships"]:
+    for rel_item in path_record["relationships"]:
         edge = normalize_edge(
-            relationship,
-            relationship.start_node.get("id"),
-            relationship.end_node.get("id")
+            rel_item["relationship"],
+            rel_item["start_id"],
+            rel_item["end_id"]
         )
-        edge["type"] = edge["type"].replace("INF_", "")
         edges.append(edge)
 
+    path = [artist["id"] for artist in nodes]
 
     return {
+        "source": source_artist_id,
+        "target": target_artist_id,
+        "path": path,
         "nodes": nodes,
         "edges": edges
     }

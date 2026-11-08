@@ -1,5 +1,12 @@
+import json
+
 from neo4j.graph import Node, Relationship
 from .types import EdgeModel, NodeModel
+
+JSON_PROPERTIES = {
+    "collaboration_recordings",
+    "produced_recordings",
+}
 
 def sanitize_value(val):
     if hasattr(val, "iso_format"):
@@ -15,7 +22,8 @@ def normalize_node(node: Node) -> NodeModel:
 
     node_dict["parameters"] = {}
     for key, value in node.items():
-        if key == "id": continue
+        if key == "id":
+            continue
         node_dict["parameters"][key] = sanitize_value(value)
 
     return node_dict
@@ -23,14 +31,17 @@ def normalize_node(node: Node) -> NodeModel:
 def normalize_edge(edge: Relationship, start_id: str, end_id: str) -> EdgeModel:
     edge_dict = {}
 
-    # edge_dict["source"] = edge.start_node.get("id")
-    # edge_dict["target"] = edge.end_node.get("id") # unfortunatly that doesn't work well
     edge_dict["source"] = start_id
     edge_dict["target"] = end_id
-    edge_dict["type"] = edge.type
+    edge_dict["type"] = edge.type.removeprefix("INF_")
 
     edge_dict["parameters"] = {}
     for key, value in edge.items():
+        if key in JSON_PROPERTIES and isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                pass
         edge_dict["parameters"][key] = sanitize_value(value)
     
     return edge_dict
