@@ -108,27 +108,29 @@ export class PathInteraction extends GraphInteraction {
     getNodeContext(node: GraphNode): NodeContext{
         if (node.id === this.sourceNodeId) {
             return { 
-                isOrigin: true, 
-                isRelated: false,
-                edges: []
+                role: "origin"
             };
         }
         
         let currentNode = this.sourceNode;
-        while(currentNode.id != node.id){
+        while(currentNode && currentNode.id != node.id){
             currentNode = currentNode.nextNode;
             if(!currentNode){
                 return {
-                    isOrigin: false,
-                    isRelated: false,
-                    edges: []
-                }
+                    role: "unrelated"
+                };
             }
         }
 
+        if (!currentNode || !currentNode.previousRelationship || !currentNode.previousNode) {
+            return {
+                role: "unrelated"
+            };
+        }
+
         return { 
-            isOrigin: false, 
-            isRelated: true,
+            role: "related",
+            referenceNodeId: currentNode.previousNode.id,
             edges: [currentNode.previousRelationship]
         };
     }

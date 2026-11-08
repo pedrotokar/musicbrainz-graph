@@ -46,26 +46,31 @@ export interface SimulationEdge extends SimulationLinkDatum<SimulationNode> {
 }
 
 //Node context returned by interactions
-export interface NodeContext {
-    isOrigin: boolean;
-    isRelated: boolean;
-    edges: GraphEdge[];
-}
+export type NodeContext =
+    | { role: "origin" }
+    | {
+          role: "related";
+          referenceNodeId: string; // Expand: origin. Path: previous node.
+          edges: GraphEdge[];      // edges between this node and reference node
+          pathStep?: { position: number; length: number; isTarget: boolean };
+      }
+    | { role: "unrelated" };
 
 export type EdgeContext = "forward" | "backward" | "bidirectional" | undefined;
 
 
 //Relationship management utility types
-export interface RelationshipDictionary {
+export interface RelationshipAppearance {
     color: string;
     displayName: string;
-    tooltipGenerator?: (edge: GraphEdge, sourceName: string, targetName: string) => string;
 }
 
+export type TooltipGenerator = (edge: GraphEdge, sourceName: string, targetName: string) => string;
 
-export type RelationshipConfig = 
-    | ({ bidirectional: true } & RelationshipDictionary)
-    | { bidirectional: false; forward: RelationshipDictionary; backward: RelationshipDictionary };
+export type RelationshipConfig = { tooltipGenerator?: TooltipGenerator } & (
+    | ({ bidirectional: true } & RelationshipAppearance)
+    | { bidirectional: false; forward: RelationshipAppearance; backward: RelationshipAppearance }
+);
 
 export type RelationshipRegistry = Record<string, RelationshipConfig>;
 

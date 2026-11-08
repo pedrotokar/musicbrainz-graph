@@ -57,9 +57,7 @@ export class ExpandInteraction extends GraphInteraction {
     getNodeContext(node: GraphNode): NodeContext {
         if (node.id === this.originNodeId) {
             return { 
-                isOrigin: true, 
-                isRelated: false,
-                edges: []
+                role: "origin"
             };
         }
         
@@ -68,10 +66,16 @@ export class ExpandInteraction extends GraphInteraction {
             (edge.target === this.originNodeId && edge.source === node.id)
         );
 
+        if (edges.length > 0) {
+            return { 
+                role: "related",
+                referenceNodeId: this.originNodeId,
+                edges
+            };
+        }
+
         return { 
-            isOrigin: false, 
-            isRelated: edges.length > 0,
-            edges
+            role: "unrelated"
         };
     }
 

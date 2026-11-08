@@ -37,6 +37,7 @@
     //Type imports
     import type { D3ZoomEvent, ZoomBehavior, D3DragEvent, DragBehavior } from "d3";
     import type { GraphNode, GraphEdge, SimulationNode, SimulationEdge, NodeContext, FilterState, EdgeContext } from "$lib/types";
+    import { getEdgeId } from "$lib/utils";
 
     import { relationshipData, RELATIONSHIP_PRIORITY_ORDER } from "$lib/components/graphs/relationships";
 	import type { GraphInteraction } from "$lib/interactions/abstractInteraction";
@@ -254,38 +255,36 @@
 
 
     function getTooltipFromContext(context: NodeContext) {
-        if (context.isOrigin){
-            return "Este é o nó de origem";
-        }
-        if (!context.isRelated){
-            return "";
-        }
-        var tooltipString = "";
-        for (const edge of context.edges){
-            const relationshipDict = relationshipData[edge.type] || relationshipData["DEFAULT"];
-            if (!relationshipDict) return "Erro!";
-
-            const sourceNode = nodes.find(n => n.id === edge.source);
-            const targetNode = nodes.find(n => n.id === edge.target);
-            const sourceName = sourceNode?.display_name || "Desconhecido";
-            const targetName = targetNode?.display_name || "Desconhecido";
-
-            const direction = selectedInteraction?.getEdgeContext(edge);
-
-            if (relationshipDict.bidirectional) {
-                if (relationshipDict.tooltipGenerator) {
-                    tooltipString += relationshipDict.tooltipGenerator(edge, sourceName, targetName);
+        switch (context.role) {
+            case "origin":
+                return "Este é o nó de origem";
+            case "unrelated":
+                return "";
+            case "related": {
+                let tooltipString = "";
+                if (context.pathStep) {
+                    tooltipString += `<strong>Passo ${context.pathStep.position} de ${context.pathStep.length - 1}</strong><br/>`;
                 }
-            } else {
-                if (direction === "forward" && relationshipDict.forward.tooltipGenerator) {
-                    tooltipString += relationshipDict.forward.tooltipGenerator(edge, sourceName, targetName);
-                } else if (direction === "backward" && relationshipDict.backward.tooltipGenerator) {
-                    tooltipString += relationshipDict.backward.tooltipGenerator(edge, sourceName, targetName);
+                for (const edge of context.edges) {
+                    const relationshipDict = relationshipData[edge.type] || relationshipData["DEFAULT"];
+                    if (!relationshipDict) return "Erro!";
+
+                    const sourceNode = nodes.find(n => n.id === edge.source);
+                    const targetNode = nodes.find(n => n.id === edge.target);
+                    const sourceName = sourceNode?.display_name || "Desconhecido";
+                    const targetName = targetNode?.display_name || "Desconhecido";
+
+                    if (relationshipDict.tooltipGenerator) {
+                        tooltipString += relationshipDict.tooltipGenerator(edge, sourceName, targetName);
+                    }
                 }
+                return tooltipString;
             }
-            
+            default: {
+                const _exhaustive: never = context;
+                return "";
+            }
         }
-        return tooltipString
     }
 
     function getNodeTooltip(node: SimulationNode) {
@@ -344,40 +343,51 @@
     }
 
     function getColorFromContext(context: NodeContext) {
-        if (context.isOrigin) return "#3b82f6";
-        if (!context.isRelated || !selectedInteraction) return "#4b5563";
+        switch (context.role) {
+            case "origin":
+                return "#3b82f6";
+            case "unrelated":
+                return "#4b5563";
+            case "related": {
+                if (!selectedInteraction) return "#4b5563";
 
-        // Filter out edges that are hidden by the active filters
-        const activeEdgesWithDirection = context.edges
-            .map((edge) => ({
-                edge,
-                direction: selectedInteraction!.getEdgeContext(edge),
-            }))
-            .filter(({ edge, direction }) => isEdgeVisible(edge, direction));
+                // Filter out edges that are hidden by the active filters
+                const activeEdgesWithDirection = context.edges
+                    .map((edge) => ({
+                        edge,
+                        direction: selectedInteraction!.getEdgeContext(edge),
+                    }))
+                    .filter(({ edge, direction }) => isEdgeVisible(edge, direction));
 
-        if (activeEdgesWithDirection.length === 0) {
-            return "#4b5563";
-        }
+                if (activeEdgesWithDirection.length === 0) {
+                    return "#4b5563";
+                }
 
-        // Sort edges by priority order (lower index = higher priority), and forward before backward
-        activeEdgesWithDirection.sort((a, b) => {
-            const priorityDiff = getRelationshipPriority(a.edge.type) - getRelationshipPriority(b.edge.type);
-            if (priorityDiff !== 0) return priorityDiff;
+                // Sort edges by priority order (lower index = higher priority), and forward before backward
+                activeEdgesWithDirection.sort((a, b) => {
+                    const priorityDiff = getRelationshipPriority(a.edge.type) - getRelationshipPriority(b.edge.type);
+                    if (priorityDiff !== 0) return priorityDiff;
 
-            if (a.direction === "forward" && b.direction === "backward") return -1;
-            if (a.direction === "backward" && b.direction === "forward") return 1;
-            return 0;
-        });
+                    if (a.direction === "forward" && b.direction === "backward") return -1;
+                    if (a.direction === "backward" && b.direction === "forward") return 1;
+                    return 0;
+                });
 
-        const winning = activeEdgesWithDirection[0];
-        const relationshipDict = relationshipData[winning.edge.type] || relationshipData["DEFAULT"];
-        if (!relationshipDict) return "#000000";
+                const winning = activeEdgesWithDirection[0];
+                const relationshipDict = relationshipData[winning.edge.type] || relationshipData["DEFAULT"];
+                if (!relationshipDict) return "#000000";
 
-        if (relationshipDict.bidirectional) {
-            return relationshipDict.color;
-        } else {
-            const dir = winning.direction === "backward" ? "backward" : "forward";
-            return relationshipDict[dir].color;
+                if (relationshipDict.bidirectional) {
+                    return relationshipDict.color;
+                } else {
+                    const dir = winning.direction === "backward" ? "backward" : "forward";
+                    return relationshipDict[dir].color;
+                }
+            }
+            default: {
+                const _exhaustive: never = context;
+                return "#4b5563";
+            }
         }
     }
 
@@ -497,7 +507,7 @@
          bind:this={svgNode}
     >
         <g stroke="#999" stroke-width="1.5" class="edges" transform="translate({zoomAppliedTransform.x}, {zoomAppliedTransform.y}) scale({zoomAppliedTransform.k})">
-            {#each simulationEdges as edge (edge.source.id + "->" + edge.target.id + "|" + edge.type)}
+            {#each simulationEdges as edge (getEdgeId(edge))}
                 <line class="edge {edge.type}"
                     class:highlighted={isConnectedEdge(edge, hoveredNode)}
                     //marker-end="url(#arrowhead-{edge.type})"

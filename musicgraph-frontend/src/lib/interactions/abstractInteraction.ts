@@ -1,4 +1,5 @@
 import type { GraphEdge, GraphNode, GenericAPIResponse, InteractionOwnedElements, NodeContext, EdgeContext } from "$lib/types";
+import { getEdgeId } from "$lib/utils";
 
 export abstract class GraphInteraction {
     constructor(
@@ -41,7 +42,7 @@ export abstract class GraphInteraction {
                 owned["nodes"].push(node.id);
             }
             for(const edge of this.interactionAPIResponse["edges"]){
-                owned["edges"].push(edge.source + "->" + edge.target + "|" + edge.type)
+                owned["edges"].push(getEdgeId(edge))
             }
         }
         return owned

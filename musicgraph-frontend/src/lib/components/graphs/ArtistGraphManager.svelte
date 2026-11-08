@@ -10,6 +10,9 @@
     //Type Imports
     import type { GraphNode, GraphEdge, FilterState, EdgeContext } from "$lib/types"
 
+    //Utility Imports
+    import { getEdgeId } from "$lib/utils";
+
     //Modules Imports
     import { GraphInteraction } from "$lib/interactions/abstractInteraction"
     import { ExpandInteraction } from "$lib/interactions/expandInteraction"
@@ -60,7 +63,7 @@
             for (const newEdge of graphData["edges"]){
                 const relativeDirection = interaction.getEdgeContext(newEdge);
                 if(relativeDirection){
-                    const newEdgeId = newEdge.source + "->" + newEdge.target + "|" + newEdge.type
+                    const newEdgeId = getEdgeId(newEdge);
                     if (!edgeMap.has(newEdgeId)){
                         edges.push(newEdge);
                         edgeMap.set(newEdgeId, newEdge)
@@ -107,7 +110,7 @@
                     if (edgeOwnershipMap.get(ownedEdgeId)?.size === 0){
                         edgeOwnershipMap.delete(ownedEdgeId);
                         edgeMap.delete(ownedEdgeId);
-                        const index = edges.findIndex(e => (e.source + "->" + e.target + "|" + e.type) === ownedEdgeId);
+                        const index = edges.findIndex(e => getEdgeId(e) === ownedEdgeId);
                         if (index !== -1) edges.splice(index, 1);
                     }
                 }
@@ -152,8 +155,8 @@
         pendingNodeIds.add(artistId);
         lastFocusIntentId = artistId;
         try {
-//            const newInteraction = await ExpandInteraction.create(artistId);
-            const newInteraction = await PathInteraction.create(artistId, "a6c6897a-7415-4f8d-b5a5-3a5e05f3be67");
+            const newInteraction = await ExpandInteraction.create(artistId);
+//            const newInteraction = await PathInteraction.create(artistId, "a6c6897a-7415-4f8d-b5a5-3a5e05f3be67");
             if (!activeInteractions.some((interaction) => interaction.getId() == newInteraction.getId())) {
                 addInteraction(newInteraction);
             }
@@ -208,7 +211,7 @@
     }
 
     let filteredEdges: GraphEdge[] = $derived(edges.filter((edge) => {
-        const edgeOwners = edgeOwnershipMap.get(edge.source + "->" + edge.target + "|" + edge.type);
+        const edgeOwners = edgeOwnershipMap.get(getEdgeId(edge));
         if(edgeOwners){
             for(const [interactionId, direction] of edgeOwners){
                 if(auxGetEdgeVisibility(edge, interactionId, direction)) return true;
@@ -302,7 +305,7 @@
 </p>
 {/each}
 
-{#each edges as edge (edge.source + "->" + edge.target + "|" + edge.type)}
+{#each edges as edge (getEdgeId(edge))}
 <p>
     {edge.source} -> {edge.target} - {edge.type}
 </p>
