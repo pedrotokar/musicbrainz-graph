@@ -155,8 +155,8 @@
         pendingNodeIds.add(artistId);
         lastFocusIntentId = artistId;
         try {
-            const newInteraction = await ExpandInteraction.create(artistId);
-//            const newInteraction = await PathInteraction.create(artistId, "a6c6897a-7415-4f8d-b5a5-3a5e05f3be67");
+//            const newInteraction = await ExpandInteraction.create(artistId);
+            const newInteraction = await PathInteraction.create(artistId, "a6c6897a-7415-4f8d-b5a5-3a5e05f3be67");
             if (!activeInteractions.some((interaction) => interaction.getId() == newInteraction.getId())) {
                 addInteraction(newInteraction);
             }

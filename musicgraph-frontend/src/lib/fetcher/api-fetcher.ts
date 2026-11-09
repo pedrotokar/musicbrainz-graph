@@ -1,13 +1,6 @@
 import type { GenericAPIResponse, PathAPIResponse, SearchResult } from '$lib/types';
 export const URL_API = "http://127.0.0.1:8000";
 
-export async function getArtistAdjacentNodes(artistId: string): Promise<GenericAPIResponse> {
-    const response = await fetch(`${URL_API}/artist/${artistId}/adjacent`);
-    const rawGraphData = await response.json() as GenericAPIResponse;
-    console.log(rawGraphData);
-    return rawGraphData;
-}
-
 export async function performArtistSearch(query: string, controller: AbortController): Promise<SearchResult[]> {
     const params = new URLSearchParams({ q: query });
     const response = await fetch(`${URL_API}/artist/search?${params.toString()}`, { signal: controller.signal });
@@ -18,6 +11,14 @@ export async function performArtistSearch(query: string, controller: AbortContro
     console.log(rawSearchData);
     return rawSearchData;
 }
+
+export async function getArtistAdjacentNodes(artistId: string): Promise<GenericAPIResponse> {
+    const response = await fetch(`${URL_API}/artist/${artistId}/adjacent`);
+    const rawGraphData = await response.json() as GenericAPIResponse;
+    console.log(rawGraphData);
+    return rawGraphData;
+}
+
 
 export async function getArtistShortestPath(sourceArtistId: string, targetArtistId: string): Promise<PathAPIResponse> {
     const response = await fetch(`${URL_API}/artist/${sourceArtistId}/shortest/${targetArtistId}`);

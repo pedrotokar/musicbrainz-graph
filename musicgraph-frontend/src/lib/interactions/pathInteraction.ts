@@ -1,81 +1,55 @@
-import type { GraphEdge, GraphNode, GenericAPIResponse, NodeContext, EdgeContext } from "$lib/types";
+import type { GraphEdge, GraphNode, NodeContext, EdgeContext, PathAPIResponse } from "$lib/types";
 import { GraphInteraction } from './abstractInteraction';
 import { getArtistShortestPath } from '$lib/fetcher/api-fetcher';
+import { getEdgeId } from '$lib/utils';
 
 export class PathInteraction extends GraphInteraction {
 
     static #instances: Map<string, WeakRef<PathInteraction>> = new Map();
     static #registry = new FinalizationRegistry((key: string) => {
         PathInteraction.#instances.delete(key);
-        console.log(`GC destructed an interaction. Key '${key}' removed from ExpandInteraction singleton registry`);
+        console.log(`GC destructed an interaction. Key '${key}' removed from PathInteraction singleton registry`);
     });
 
     private sourceNodeName: string;
     private targetNodeName: string;
-    
-    // Path linked list head
-    // TODO: think if this is the best solution. I think the ideal would be
-    // offsetting this logic to the backend somehow and getting everything 
-    // treated nicely here but maybe that will be hard, idk
-    private sourceNode: any;
 
+    private pathNodeIds: string[];
+    private pathEdges: GraphEdge[];
+    private positionById: Map<string, number>;
+    private positionByEdgeKey: Map<string, number>;
 
     private constructor(
-        interactionAPIResponse: GenericAPIResponse, 
+        interactionAPIResponse: PathAPIResponse, 
         private sourceNodeId: string,
         private targetNodeId: string
     ){
         super(crypto.randomUUID(), interactionAPIResponse);
-        const sourceArtistNode = interactionAPIResponse["nodes"].find((node) => node.id === sourceNodeId);
-        const targetArtistNode = interactionAPIResponse["nodes"].find((node) => node.id === targetNodeId);
+        const sourceArtistNode = interactionAPIResponse.nodes.find((node) => node.id === sourceNodeId);
+        const targetArtistNode = interactionAPIResponse.nodes.find((node) => node.id === targetNodeId);
         if (sourceArtistNode && targetArtistNode){
             this.sourceNodeName = sourceArtistNode.display_name;
             this.targetNodeName = targetArtistNode.display_name;
-            
-            // Constructing the linked list
-            // TODO: Review this entire logic
-            this.sourceNode = sourceArtistNode;
-            let currentNode;
-            let nextNode;
-            let nextRelationship = interactionAPIResponse["edges"].find((edge) => edge.target === sourceArtistNode.id || edge.source === sourceArtistNode.id) //Supposed to be only one
-            if (nextRelationship?.target === this.sourceNode.id) {
-                currentNode = interactionAPIResponse["nodes"].find((node) => node.id === nextRelationship?.source);
-            } else {
-                currentNode = interactionAPIResponse["nodes"].find((node) => node.id === nextRelationship?.target);
-            }
-            this.sourceNode.nextRelationship = nextRelationship;
-            this.sourceNode.nextNode = currentNode;
-            currentNode.previousRelationship = nextRelationship;
-            currentNode.previousNode = this.sourceNode;
 
+            this.pathNodeIds = interactionAPIResponse.path;
+            this.pathEdges = interactionAPIResponse.edges;
 
-            while(currentNode?.id != targetArtistNode.id){
-                let nextRelationship = interactionAPIResponse["edges"].find((edge) => (edge.target === currentNode.id && edge.source !== currentNode.previousNode.id) || (edge.source === currentNode.id && edge.target !== currentNode.previousNode.id)) //Supposed to be only one
-                if (nextRelationship?.target === currentNode.id) {
-                    nextNode = interactionAPIResponse["nodes"].find((node) => node.id === nextRelationship?.source);
-                } else {
-                    nextNode = interactionAPIResponse["nodes"].find((node) => node.id === nextRelationship?.target);
-                }
-                currentNode.nextRelationship = nextRelationship;
-                currentNode.nextNode = nextNode;
-                nextNode.previousRelationship = nextRelationship;
-                nextNode.previousNode = currentNode;
-                currentNode = nextNode;
-
+            this.positionById = new Map();
+            for (let i = 0; i < this.pathNodeIds.length; i++) {
+                this.positionById.set(this.pathNodeIds[i], i);
             }
 
+            this.positionByEdgeKey = new Map();
+            for (let i = 0; i < this.pathEdges.length; i++) {
+                this.positionByEdgeKey.set(getEdgeId(this.pathEdges[i]), i);
+            }
         } else {
-            throw new Error("Path interaction API response did not include the source or target node.")
+            throw new Error("Path interaction API response did not include the source or target node.");
         }
     }
 
-    static async create(sourceNodeId: string, targetNodeId: string){
-        let key;
-        if(sourceNodeId < targetNodeId){
-            key = sourceNodeId + "<>" + targetNodeId;
-        } else {
-            key = targetNodeId + "<>" + sourceNodeId;
-        }
+    static async create(sourceNodeId: string, targetNodeId: string): Promise<PathInteraction>{
+        const key = `${sourceNodeId}->${targetNodeId}`;
         //Singleton logic
         if (this.#instances.has(key)) {
             const ref = this.#instances.get(key);
@@ -93,7 +67,7 @@ export class PathInteraction extends GraphInteraction {
         
         this.#instances.set(key, new WeakRef(newInstance));
         this.#registry.register(newInstance, key); //This is used to notify the instance has been deleted and thus delete the key
-        return newInstance
+        return newInstance;
     }
 
     getShowText(): string {
@@ -104,49 +78,55 @@ export class PathInteraction extends GraphInteraction {
         return this.targetNodeId;
     }
 
-    //TODO: evaluate if these solutions based on the linked list are the best options
-    getNodeContext(node: GraphNode): NodeContext{
-        if (node.id === this.sourceNodeId) {
+    getNodeContext(node: GraphNode): NodeContext {
+        const pos = this.positionById.get(node.id);
+        if (pos === undefined) {
             return { 
-                role: "origin"
+                role: "unrelated" 
             };
         }
-        
-        let currentNode = this.sourceNode;
-        while(currentNode && currentNode.id != node.id){
-            currentNode = currentNode.nextNode;
-            if(!currentNode){
-                return {
-                    role: "unrelated"
-                };
-            }
+        if (pos === 0) {
+            return { 
+                role: "origin" 
+            };
         }
 
-        if (!currentNode || !currentNode.previousRelationship || !currentNode.previousNode) {
-            return {
-                role: "unrelated"
-            };
-        }
+        const referenceNodeId = this.pathNodeIds[pos - 1];
+        const edge = this.pathEdges[pos - 1];
 
         return { 
             role: "related",
-            referenceNodeId: currentNode.previousNode.id,
-            edges: [currentNode.previousRelationship]
+            referenceNodeId,
+            edges: edge ? [edge] : [],
+            pathStep: {
+                position: pos,
+                length: this.pathNodeIds.length,
+                isTarget: pos === this.pathNodeIds.length - 1
+            }
         };
     }
 
-    getEdgeContext(edge: GraphEdge): EdgeContext{
-        return "forward"
+    getEdgeContext(edge: GraphEdge): EdgeContext {
+        const edgeKey = getEdgeId(edge);
+        const index = this.positionByEdgeKey.get(edgeKey);
+        if (index === undefined) {
+            return undefined;
+        }
+
+        const referenceNodeId = this.pathNodeIds[index];
+        if (edge.source === referenceNodeId) {
+            return "forward";
+        } else {
+            return "backward";
+        }
     }
 
     shouldAlwaysShowNode(node: GraphNode): boolean {
-        return this.interactionAPIResponse["nodes"].some((pathNode) => pathNode.id == node.id);
+        return this.positionById.has(node.id);
     }
 
-    //TODO: fix this so it actually dont hide the path edge
     shouldAlwaysShowEdge(edge: GraphEdge): boolean {
-//        return this.interactionAPIResponse["edges"].some((pathEdge) => pathEdge.id == edge.id);
-        return false
+        return this.positionByEdgeKey.has(getEdgeId(edge));
     }
 
 }
