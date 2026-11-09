@@ -149,14 +149,12 @@
         requestFocus(lastFocusIntentId);
     }
 
-    //TODO: improve this, decide where the logic goes
     async function expandArtist(artistId: string) {
         if (pendingNodeIds.has(artistId)) return; // already on its way
         pendingNodeIds.add(artistId);
         lastFocusIntentId = artistId;
         try {
-//            const newInteraction = await ExpandInteraction.create(artistId);
-            const newInteraction = await PathInteraction.create(artistId, "a6c6897a-7415-4f8d-b5a5-3a5e05f3be67");
+            const newInteraction = await ExpandInteraction.create(artistId);
             if (!activeInteractions.some((interaction) => interaction.getId() == newInteraction.getId())) {
                 addInteraction(newInteraction);
             }
@@ -167,10 +165,62 @@
             }
             // applyFilter();
         } catch (e) {
-            console.warn("Path interaction failed:", e instanceof Error ? e.message : e);
+            console.warn("Expand interaction failed:", e instanceof Error ? e.message : e);
         } finally {
             pendingNodeIds.delete(artistId);
             console.log("finished expanding");
+        }
+    }
+
+    // ------------------ Implementing shortest path search flux ------------------
+    const pendingPathKeys = new SvelteSet<string>();
+    let isPathSearchOpen = $state(false);
+    let pathSourceArtist: GraphNode | undefined = $state();
+
+    function startPathSearch(sourceArtistId: string) {
+        const artist = nodeMap.get(sourceArtistId) || nodes.find(n => n.id === sourceArtistId);
+        if (artist) {
+            pathSourceArtist = artist;
+            isPathSearchOpen = true;
+        }
+    }
+
+    function closePathSearch() {
+        isPathSearchOpen = false;
+        pathSourceArtist = undefined;
+    }
+
+    async function handlePathTargetSelected(targetArtistId: string) {
+        const sourceId = pathSourceArtist?.id;
+        closePathSearch();
+        if (sourceId) {
+            await findPath(sourceId, targetArtistId);
+        }
+    }
+
+    async function findPath(sourceArtistId: string, targetArtistId: string) {
+        if (sourceArtistId === targetArtistId) {
+            console.warn("Source and target must be different artists.");
+            return;
+        }
+        const pathKey = `${sourceArtistId}->${targetArtistId}`;
+        if (pendingPathKeys.has(pathKey)) return;
+        pendingPathKeys.add(pathKey);
+        lastFocusIntentId = targetArtistId;
+
+        try {
+            const newInteraction = await PathInteraction.create(sourceArtistId, targetArtistId);
+            if (!activeInteractions.some((interaction) => interaction.getId() == newInteraction.getId())) {
+                addInteraction(newInteraction);
+            }
+            if (lastFocusIntentId === targetArtistId) {
+                selectedInteraction = newInteraction;
+                requestFocus(newInteraction.getFocusNodeId(), 1);
+            }
+        } catch (e) {
+            console.warn("Path interaction failed:", e instanceof Error ? e.message : e);
+        } finally {
+            pendingPathKeys.delete(pathKey);
         }
     }
 
@@ -198,7 +248,6 @@
         const interactionLock = interaction?.shouldAlwaysShowEdge(edge);
 
         let filterLock;
-        console.log(edge.type)
         const filterStatus = activeFilters[edge.type];
         if(filterStatus.bidirectional) {
             filterLock = filterStatus.show;
@@ -279,7 +328,7 @@
 
 <div class="graph-layout">
     <div class="graph-canvas">
-        <Graph nodes={filteredNodes} edges={filteredEdges} onClickCallbackFunction={expandArtist} selectedInteraction={selectedInteraction} activeFilters={activeFilters} pendingNodeIds={pendingNodeIds} focusTarget={focusTarget}/>
+        <Graph nodes={filteredNodes} edges={filteredEdges} onClickCallbackFunction={expandArtist} onRequestPathFunction={startPathSearch} selectedInteraction={selectedInteraction} activeFilters={activeFilters} pendingNodeIds={pendingNodeIds} focusTarget={focusTarget}/>
     </div>
     
     <div class="hud-overlay">
@@ -296,6 +345,28 @@
         </div>
         
     </div>
+
+    {#if isPathSearchOpen && pathSourceArtist}
+        <div class="modal-backdrop" onclick={closePathSearch} role="presentation">
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <div class="modal-dialog" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" tabindex="-1">
+                <div class="modal-header">
+                    <div>
+                        <h3>Traçar caminho mais curto</h3>
+                        <p class="modal-subtitle">Origem: <strong>{pathSourceArtist.display_name}</strong></p>
+                    </div>
+                    <button type="button" class="modal-close-btn" onclick={closePathSearch} aria-label="Fechar">✕</button>
+                </div>
+                <div class="modal-body">
+                    <p class="modal-instruction">Selecione o artista de destino:</p>
+                    <div class="modal-search-wrapper">
+                        <ArtistSearch onArtistSelectFunction={handlePathTargetSelected} />
+                    </div>
+                </div>
+            </div>
+        </div>
+    {/if}
 </div>
 
 
@@ -364,6 +435,79 @@
 .color-legend-filter {
     top: 20px;
     left: 20px;
+}
+
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-dialog {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    width: 440px;
+    max-width: 90vw;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+    border: 1px solid #e2e8f0;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #0f172a;
+}
+
+.modal-subtitle {
+    margin: 4px 0 0 0;
+    font-size: 13px;
+    color: #64748b;
+}
+
+.modal-subtitle strong {
+    color: #1e293b;
+}
+
+.modal-close-btn {
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: #94a3b8;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+}
+
+.modal-close-btn:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+
+.modal-instruction {
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: #475569;
+}
+
+.modal-search-wrapper {
+    position: relative;
+    width: 100%;
 }
 
 </style>

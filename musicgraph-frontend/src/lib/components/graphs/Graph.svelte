@@ -47,6 +47,7 @@
         edges: GraphEdge[];
 //        graphChangesCounter: number;
         onClickCallbackFunction: (nodeId: string) => void;
+        onRequestPathFunction?: (nodeId: string) => void;
         selectedInteraction: GraphInteraction | undefined;
         activeFilters: FilterState;
         pendingNodeIds: Set<string>;
@@ -54,7 +55,7 @@
         focusTarget: { nodeId: string, scale: number | undefined } | undefined;
     }
 
-    let { nodes, edges, onClickCallbackFunction, selectedInteraction, activeFilters, pendingNodeIds, focusTarget }: Props = $props();
+    let { nodes, edges, onClickCallbackFunction, onRequestPathFunction, selectedInteraction, activeFilters, pendingNodeIds, focusTarget }: Props = $props();
 
     let simulationNodes: SimulationNode[] = $state([])
     let simulationEdges: SimulationEdge[] = $state([])
@@ -543,6 +544,16 @@
      onmouseenter={handleTooltipMouseEnter}
      onmouseleave={handleTooltipMouseLeave}
      role="tooltip">
+    {#if onRequestPathFunction}
+        <div class="tooltip-actions">
+            <button 
+                type="button" 
+                class="tooltip-btn"
+                onclick={() => { if (hoveredNode) onRequestPathFunction?.(hoveredNode.id); }}>
+                Traçar caminho mais curto
+            </button>
+        </div>
+    {/if}
     {@html getNodeTooltip(hoveredNode)}
 </div>
 {/if}
@@ -558,6 +569,29 @@
         position: absolute;
         top: 0;
         left: 0;
+    }
+
+    .tooltip-actions {
+        margin-bottom: 8px;
+        padding-bottom: 6px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .tooltip-btn {
+        width: 100%;
+        background-color: #2563eb;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 5px 10px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+
+    .tooltip-btn:hover {
+        background-color: #1d4ed8;
     }
 
     .edge, .node circle, .node text {
