@@ -87,7 +87,7 @@
 //     endNode(vRelationship).id AS end_id;
 
 MATCH (sourceArtist:Artist {id: $id})
-MATCH (sourceArtist)-[relationship:INF_HAS_MUSICAL_CONNECTION_TO|INF_HAS_PERSONAL_CONNECTION_TO|INF_COLLABORATED_WITH|INF_COVERED|INF_PRODUCED]-(artist:Artist)
+MATCH (sourceArtist)-[relationship:INF_HAS_MUSICAL_CONNECTION_TO|INF_HAS_PERSONAL_CONNECTION_TO|INF_COLLABORATED_WITH|INF_COVERED|INF_PRODUCED|INF_SAMPLED]-(artist:Artist)
 RETURN
     relationship,
     artist,

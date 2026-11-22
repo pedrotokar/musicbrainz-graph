@@ -1,6 +1,6 @@
 // INF_COLLABORATED_WITH a partir de gravações com créditos em comum.
 // Bidirecional: guardada uma vez, do menor id para o maior (a.id < b.id).
-// Deve rodar ANTES de 20_inf_from_is_related_to.cypher, para esta versão (com gravações) prevalecer.
+// Deve rodar ANTES de 30_inf_from_is_related_to.cypher, para esta versão (com gravações) prevalecer.
 // collaboration_recordings é gravado como JSON ([[id, title], ...]) pois o Neo4j não aceita listas aninhadas.
 MATCH (a:Artist)
 CALL (a) {

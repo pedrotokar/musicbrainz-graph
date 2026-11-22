@@ -4,6 +4,8 @@
 // COVERED é direcionada e mantém a direção original.
 // Para COLLABORATED_WITH, as propriedades só entram na criação: se já existir a aresta de
 // 10_inf_collaborated_with_recordings.cypher, ela prevalece e não é alterada.
+// O mesmo vale para INF_COVERED: se já existir a aresta de 20_inf_covered.cypher, ela prevalece
+// (nesse caso o is_tribute_band não é aplicado a esse par).
 MATCH (x:Artist)-[rel:IS_RELATED_TO]->(y:Artist)
 WHERE x <> y
 WITH x, y, rel,

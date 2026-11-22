@@ -75,6 +75,8 @@ INF_RELATIONSHIP_TYPES = [
     "INF_COLLABORATED_WITH",
     "INF_COVERED",
     "INF_PRODUCED",
+    "INF_SAMPLED",
+    "INF_ORIGINAL_ARTIST",
 ]
 
 POSTPROCESS_DIR = Path(__file__).parent / "postprocess"
