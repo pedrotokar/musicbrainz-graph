@@ -1,5 +1,5 @@
 CALL db.index.fulltext.queryNodes("artist_search", $query) YIELD node, score
-MATCH (node)-[r]-()
+MATCH (node)-[r:IS_RELATED_TO|CREDITED_IN|PARTICIPATED_IN]-()
 WITH node, score, count(r) AS degree
 // Creates a final score blending text similarity with node popularity (degree)
 RETURN node.id AS id, node.name AS name, node.disambiguation AS disambiguation, (score * (1 + log10(degree + 1))) AS finalScore

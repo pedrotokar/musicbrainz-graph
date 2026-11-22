@@ -72,10 +72,20 @@ export const relationshipData: RelationshipRegistry = {
     "COVERED": {
         "bidirectional": false,
         "tooltipGenerator": (edge: GraphEdge, sourceName: string, targetName: string) => {
-            if (edge.parameters.is_tribute_band) {
-                return `<strong>${sourceName}</strong> é uma banda tributo de <strong>${targetName}</strong>.<br/>`;
+            const songs = (edge.parameters as Record<string, unknown>).covered_songs as [string, string][] | undefined;
+            let html = edge.parameters.is_tribute_band
+                ? `<strong>${sourceName}</strong> é uma banda tributo de <strong>${targetName}</strong>`
+                : `<strong>${sourceName}</strong> fez cover de músicas de <strong>${targetName}</strong>`;
+            if (songs && songs.length > 0) {
+                html += `:<ul style="margin: 4px 0 8px 16px; padding: 0;">`;
+                for (const [id, title] of songs) {
+                    html += `<li><a href="https://musicbrainz.org/work/${id}" target="_blank">${title}</a></li>`;
+                }
+                html += `</ul>`;
+            } else {
+                html += `.<br/>`;
             }
-            return `<strong>${sourceName}</strong> fez cover de músicas de <strong>${targetName}</strong>.<br/>`;
+            return html;
         },
         "forward": {
             "displayName": "Teve uma música regravada pelo artista selecionado",
@@ -115,7 +125,22 @@ export const relationshipData: RelationshipRegistry = {
     "SAMPLED": {
         "bidirectional": false,
         "tooltipGenerator": (edge: GraphEdge, sourceName: string, targetName: string) => {
-            return `<strong>${sourceName}</strong> fez um sample de uma música de <strong>${targetName}</strong>.<br/>`;
+            const samples = (edge.parameters as Record<string, unknown>).sampled_recordings as [[string, string, string[]], [string, string, string[]]][] | undefined;
+            let html = `<strong>${sourceName}</strong> fez um sample de uma música de <strong>${targetName}</strong>`;
+            if (samples && samples.length > 0) {
+                const link = ([id, title, labels]: [string, string, string[]]) => {
+                    const type = labels.includes("Release") ? "release" : "recording";
+                    return `<a href="https://musicbrainz.org/${type}/${id}" target="_blank">${title}</a>`;
+                };
+                html += `:<ul style="margin: 4px 0 8px 16px; padding: 0;">`;
+                for (const [sampler, sampled] of samples) {
+                    html += `<li>${link(sampler)} sampleou ${link(sampled)}</li>`;
+                }
+                html += `</ul>`;
+            } else {
+                html += `.<br/>`;
+            }
+            return html;
         },
         "forward": {
             "displayName": "Teve uma música sampleada pelo artista selecionado",

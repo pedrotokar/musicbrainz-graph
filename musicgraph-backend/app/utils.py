@@ -6,6 +6,8 @@ from .types import EdgeModel, NodeModel
 JSON_PROPERTIES = {
     "collaboration_recordings",
     "produced_recordings",
+    "covered_songs",
+    "sampled_recordings",
 }
 
 def sanitize_value(val):
