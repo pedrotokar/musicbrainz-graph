@@ -27,13 +27,23 @@ WITH
     CASE WHEN data.bidirectional AND x.id > y.id THEN y ELSE x END AS src,
     CASE WHEN data.bidirectional AND x.id > y.id THEN x ELSE y END AS dst,
     data.type AS type,
-    rel.subtypes AS subtypes
-WITH src, dst, type, apoc.coll.toSet(apoc.coll.flatten(COLLECT(subtypes))) AS subtypes
+    rel.subtypes AS subtypes,
+    rel.start_date AS rel_start_date
+WITH src, dst, type,
+     apoc.coll.toSet(apoc.coll.flatten(COLLECT(subtypes))) AS subtypes,
+     MIN(rel_start_date) AS min_start_date
 WITH src, dst, type,
     CASE type
-        WHEN "INF_HAS_MUSICAL_CONNECTION_TO" THEN {subtypes: subtypes}
-        WHEN "INF_HAS_PERSONAL_CONNECTION_TO" THEN {subtypes: subtypes}
-        WHEN "INF_COVERED" THEN {is_tribute_band: TRUE}
+        WHEN "INF_HAS_MUSICAL_CONNECTION_TO" THEN {subtypes: subtypes, start_date: min_start_date}
+        WHEN "INF_HAS_PERSONAL_CONNECTION_TO" THEN {subtypes: subtypes, start_date: min_start_date}
+        WHEN "INF_COLLABORATED_WITH" THEN {start_date: min_start_date}
+        WHEN "INF_COVERED" THEN {
+            is_tribute_band: TRUE,
+            start_date: coalesce(
+                min_start_date,
+                CASE WHEN src.begin =~ '^\d{4}(-\d{2}(-\d{2})?)?$' THEN date(src.begin) END
+            )
+        }
         ELSE {}
     END AS props
 CALL (src, dst, type, props) {

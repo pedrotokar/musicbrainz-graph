@@ -19,10 +19,12 @@
 //   - "Various Artists" foi removido, então tributos e coletâneas creditados assim são perdidos.
 MATCH (w:Work)
 CALL (w) {
-    // Primeira gravação da obra
-    MATCH (w)<-[:IS_PERFORMANCE_OF]-(reco:Recording)-[:IS_CONTAINED_ON]->(rel:Release)
-    WHERE rel.release_date IS NOT NULL
-    WITH reco, MIN(rel.release_date) AS first_date
+    // Primeira gravação da obra (data da performance ou release mais antigo)
+    MATCH (w)<-[perf:IS_PERFORMANCE_OF]-(reco:Recording)
+    OPTIONAL MATCH (reco)-[:IS_CONTAINED_ON]->(rel:Release)
+    WITH reco, coalesce(perf.start_date, rel.release_date) AS effective_date
+    WHERE effective_date IS NOT NULL
+    WITH reco, MIN(effective_date) AS first_date
     ORDER BY first_date ASC, reco.id ASC
     LIMIT 1
 
@@ -31,12 +33,13 @@ CALL (w) {
     WHERE any(s IN p.subtypes WHERE s IN ["composer", "writer", "lyricist"])
     OPTIONAL MATCH (writer)-[m:IS_RELATED_TO]-(band:Artist)
     WHERE any(s IN m.subtypes WHERE s IN ["member of band", "founder", "subgroup"])
-    WITH reco, COLLECT(DISTINCT writer) + COLLECT(DISTINCT band) AS candidates
+    WITH reco, first_date, COLLECT(DISTINCT writer) + COLLECT(DISTINCT band) AS candidates
 
     // União: candidatos creditados na primeira gravação
     UNWIND candidates AS c
-    WITH DISTINCT reco, c
+    WITH DISTINCT reco, c, first_date
     WHERE (c)-[:CREDITED_IN]->(reco)
     MERGE (w)-[o:INF_ORIGINAL_ARTIST]->(c)
-    SET o.recording_id = reco.id
+    SET o.recording_id = reco.id,
+        o.start_date = first_date
 } IN TRANSACTIONS OF 1000 ROWS

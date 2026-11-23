@@ -1,3 +1,4 @@
+import argparse
 from collections import defaultdict
 from datetime import datetime
 import json
@@ -27,6 +28,25 @@ def datetime_valid(dt_str):
         return True
     except ValueError:
         return False
+
+def normalize_date(dt_str):
+    if not dt_str or not isinstance(dt_str, str):
+        return None
+        
+    parts = dt_str.split("-")
+    
+    if len(parts) == 1:
+        dt_str_to_check = dt_str + "-01-01"
+    elif len(parts) == 2:
+        dt_str_to_check = dt_str + "-01"
+    else:
+        dt_str_to_check = dt_str
+        
+    try:
+        datetime.fromisoformat(dt_str_to_check)
+        return dt_str_to_check
+    except ValueError:
+        return None
 
 # ==========================================
 # 1. CONFIGURAÇÃO DO NEO4J
@@ -124,7 +144,10 @@ relationship_queries = {
         UNWIND $batch AS rel
         MATCH (w:Work {id: rel.work_id})
         MATCH (r:Recording {id: rel.recording_id})
-        MERGE (r)-[:IS_PERFORMANCE_OF]->(w)
+        MERGE (r)-[edge:IS_PERFORMANCE_OF]->(w)
+        SET edge.start_date = coalesce(date(rel.start_date), edge.start_date),
+            edge.end_date = coalesce(date(rel.end_date), edge.end_date),
+            r.performance_date = coalesce(date(rel.start_date), r.performance_date)
     """,
     "recording_release_contained": """
         UNWIND $batch AS rel
@@ -160,7 +183,9 @@ relationship_queries = {
         MATCH (a1:Artist {id: rel.artist_1_id})
         MATCH (a2:Artist {id: rel.artist_2_id})
         MERGE (a1)-[edge:IS_RELATED_TO]->(a2)
-        SET edge.subtypes = rel.subtypes, edge.start_date = rel.start_date, edge.end_date = rel.end_date
+        SET edge.subtypes = rel.subtypes,
+            edge.start_date = coalesce(date(rel.start_date), edge.start_date),
+            edge.end_date = coalesce(date(rel.end_date), edge.end_date)
     """,
     "artist_recording_generic": """
         UNWIND $batch AS rel
@@ -227,25 +252,51 @@ def flush_batches(session, force=False):
     if force or any(len(lst) >= BATCH_SIZE for lst in entity_batches.values()) or any(len(lst) >= BATCH_SIZE for lst in relationship_batches.values()):
         
         for entity, batch in entity_batches.items():
-            session.execute_write(get_batch_insert_function(entity_queries[entity]), batch)
+            if batch:
+                session.execute_write(get_batch_insert_function(entity_queries[entity]), batch)
         
         for relationship, batch in relationship_batches.items():
-            session.execute_write(get_batch_insert_function(relationship_queries[relationship]), batch)
+            if batch:
+                session.execute_write(get_batch_insert_function(relationship_queries[relationship]), batch)
 
-        for batch in entity_batches.items():
+        for batch in entity_batches.values():
             batch.clear()
 
-        for batch in relationship_batches.items():
+        for batch in relationship_batches.values():
             batch.clear()
 
 
 # ==========================================
 # 4. LEITURA DE ARQUIVOS (.TAR.XZ)
 # ==========================================
-for tar in ["dumps/artist.tar.xz", "dumps/work.tar.xz", "dumps/release.tar.xz", "dumps/recording.tar.xz", "dumps/release-group.tar.xz"]:
+parser = argparse.ArgumentParser(description="Populate Neo4j with MusicBrainz dump data.")
+parser.add_argument(
+    "--step",
+    choices=["all", "artists", "works", "releasegroups", "releases", "orphan-recordings", "relations"],
+    default="all",
+    help="Etapa a ser executada (padrão: 'all'). Use 'relations' para rodar apenas a extração de relações de artistas sem reprocessar entidades."
+)
+args = parser.parse_args()
+
+step_dumps = {
+    "artists": ["dumps/artist.tar.xz"],
+    "works": ["dumps/work.tar.xz"],
+    "releasegroups": ["dumps/release-group.tar.xz"],
+    "releases": ["dumps/release.tar.xz"],
+    "orphan-recordings": ["dumps/recording.tar.xz"],
+    "relations": ["dumps/artist.tar.xz"],
+}
+
+needed_tars = (
+    ["dumps/artist.tar.xz", "dumps/work.tar.xz", "dumps/release.tar.xz", "dumps/recording.tar.xz", "dumps/release-group.tar.xz"]
+    if args.step == "all"
+    else step_dumps[args.step]
+)
+
+for tar in needed_tars:
     if not (isfile(tar) and tarfile.is_tarfile(tar)):
         print(tar, "is missing! Aborting to prevent bad surprises...")
-        sys.exit()
+        sys.exit(1)
 
 def iter_in_file(tar_name, file_name):
     xz_call = subprocess.Popen(["xz", "-dc", "-T10", tar_name], stdout=subprocess.PIPE)
@@ -266,166 +317,187 @@ def iter_in_file(tar_name, file_name):
 with driver.session() as session:
     
     # --- 5.1 ARTISTAS ---
-    print("Processando Artistas...")
-    for index, dict_ in tqdm(iter_in_file("dumps/artist.tar.xz", "mbdump/artist"), total=2875751):
-        life = dict_.get("life-span", {})
-        entity_batches['artist'].append({
-            "name": dict_.get("name"), "id": dict_.get("id"), 
-            "aliases": [alias["name"] for alias in dict_.get("aliases", [])],
-            "disambiguation": dict_.get("disambiguation"),
-            "begin": life.get("begin"), "end": life.get("end"), "ended": life.get("ended")
-        })
-        flush_batches(session)
-    flush_batches(session, force=True) # Esvazia sobras
+    if args.step in ["all", "artists"]:
+        print("Processando Artistas...")
+        for index, dict_ in tqdm(iter_in_file("dumps/artist.tar.xz", "mbdump/artist"), total=2875751):
+            life = dict_.get("life-span", {})
+            entity_batches['artist'].append({
+                "name": dict_.get("name"), "id": dict_.get("id"), 
+                "aliases": [alias["name"] for alias in dict_.get("aliases", [])],
+                "disambiguation": dict_.get("disambiguation"),
+                "begin": life.get("begin"), "end": life.get("end"), "ended": life.get("ended")
+            })
+            flush_batches(session)
+        flush_batches(session, force=True) # Esvazia sobras
 
     # --- 5.2 OBRAS (WORKS) ---
-    print("Processando Obras...")
-    for index, dict_ in tqdm(iter_in_file("dumps/work.tar.xz", "mbdump/work"), total=2734379):
-        entity_batches['work'].append({"id": dict_.get("id"), "title": dict_.get("title"), "type": dict_.get("type")})
-        flush_batches(session)
-    flush_batches(session, force=True)
-
+    if args.step in ["all", "works"]:
+        print("Processando Obras...")
+        for index, dict_ in tqdm(iter_in_file("dumps/work.tar.xz", "mbdump/work"), total=2734379):
+            entity_batches['work'].append({"id": dict_.get("id"), "title": dict_.get("title"), "type": dict_.get("type")})
+            flush_batches(session)
+        flush_batches(session, force=True)
 
     # --- 5.3 RELEASE GROUPS ---
-    print("Processando Release Groups...")
-    for index, dict_ in tqdm(iter_in_file("dumps/release-group.tar.xz", "mbdump/release-group"), total=4448821):
-        rg_id = dict_.get("id")
-        rg_date = dict_.get("first-release-date")
-        if not datetime_valid(rg_date):
-            rg_date = None
-        entity_batches['releasegroup'].append({"id": rg_id, "title": dict_.get("title"), "first-release-date": rg_date, "primary-type": dict_.get("primary-type"), "secondary-types": dict_.get("secondary-types")})
-        for credited in dict_.get("artist-credit", []):
-            if credited.get("artist"):
-                relationship_batches["artist_releasegroup_credited"].append({"artist_id": credited["artist"].get("id"), "release_group_id": rg_id, "subtype": "credited"})
+    if args.step in ["all", "releasegroups"]:
+        print("Processando Release Groups...")
+        for index, dict_ in tqdm(iter_in_file("dumps/release-group.tar.xz", "mbdump/release-group"), total=4448821):
+            rg_id = dict_.get("id")
+            rg_date = dict_.get("first-release-date")
+            if not datetime_valid(rg_date):
+                rg_date = None
+            entity_batches['releasegroup'].append({"id": rg_id, "title": dict_.get("title"), "first-release-date": rg_date, "primary-type": dict_.get("primary-type"), "secondary-types": dict_.get("secondary-types")})
+            for credited in dict_.get("artist-credit", []):
+                if credited.get("artist"):
+                    relationship_batches["artist_releasegroup_credited"].append({"artist_id": credited["artist"].get("id"), "release_group_id": rg_id, "subtype": "credited"})
 
-                    
-        flush_batches(session)
-    flush_batches(session, force=True)
+            flush_batches(session)
+        flush_batches(session, force=True)
 
     # --- 5.4 LANÇAMENTOS E SUAS RELAÇÕES TOTAIS ---
-    print("Processando Lançamentos, Grupos, Gravações e Arestas Triviais...")
-    for index, dict_ in tqdm(iter_in_file("dumps/release.tar.xz", "mbdump/release"), total=4774602):
-        release_id = dict_.get("id")
-        date = dict_.get("date")
-        # 1. Adicionar Release
-        if not datetime_valid(date):
-            date = None
+    if args.step in ["all", "releases"]:
+        print("Processando Lançamentos, Grupos, Gravações e Arestas Triviais...")
+        for index, dict_ in tqdm(iter_in_file("dumps/release.tar.xz", "mbdump/release"), total=4774602):
+            release_id = dict_.get("id")
+            date = dict_.get("date")
+            # 1. Adicionar Release
+            if not datetime_valid(date):
+                date = None
 
-        entity_batches["release"].append({"id": release_id, "title": dict_.get("title"), "date": date, "status": dict_.get("status")})
-        for credited in dict_.get("artist-credit", []):
-            if credited.get("artist"):
-                relationship_batches["artist_release_credited"].append({"artist_id": credited["artist"].get("id"), "release_id": release_id, "subtype": "credited"})
-        
-        # 2. Adicionar Release Group e a relação Release -> RG
-        if "release-group" in dict_:
-            rg = dict_["release-group"]
-            rg_id = rg.get("id")
-            relationship_batches["release_releasegroup_instance"].append({"release_id": release_id, "release_group_id": rg_id})
+            entity_batches["release"].append({"id": release_id, "title": dict_.get("title"), "date": date, "status": dict_.get("status")})
+            for credited in dict_.get("artist-credit", []):
+                if credited.get("artist"):
+                    relationship_batches["artist_release_credited"].append({"artist_id": credited["artist"].get("id"), "release_id": release_id, "subtype": "credited"})
+            
+            # 2. Adicionar Release Group e a relação Release -> RG
+            if "release-group" in dict_:
+                rg = dict_["release-group"]
+                rg_id = rg.get("id")
+                relationship_batches["release_releasegroup_instance"].append({"release_id": release_id, "release_group_id": rg_id})
 
-        # 3. Adicionar Recordings e relações
-        for media_index, media in enumerate(dict_.get("media", [])):
-            for track_index, track in enumerate(media.get("tracks", [])):
-                recording = track.get("recording")
-                if recording:
-                    rec_id = recording.get("id")
-                    entity_batches['recording'].append({"id": rec_id, "title": recording.get("title")})
-                    relationship_batches["recording_release_contained"].append({
-                        "recording_id": rec_id, 
-                        "release_id": release_id,
-                        "media_index": media_index, 
-                        "media_id": media["id"], 
-                        "track_index": track_index,
-                        "track_id": track["id"]
-                    })
-                    
-                    # 4. Relações da recording com Work, recording e release group dentro das propriedades do recording
-                    for rel in recording.get("relations", []):
-                        if rel.get("target-type") == "work": #um performance aqui seria redundante tb
-                            work = rel.get("work")
-                            if work:
-                                relationship_batches["recording_work_performance"].append({"work_id": work.get("id"), "recording_id": rec_id})
-                        elif rel.get("target-type") == "recording" and rel.get("type") == "samples material" and rel.get("direction") == "forward": #samples material redundante
-                            recording_2 = rel.get("recording")
-                            if recording_2:
-                                relationship_batches["recording_recording_sample"].append({"recording_id": recording.get("id"), "recording_2_id": recording_2.get("id")})
-                        elif rel.get("target-type") == "release" and rel.get("type") == "samples material": #samples material redundante
-                            release = rel.get("release")
-                            if release:
-                                relationship_batches["recording_release_sample"].append({"recording_id": recording.get("id"), "release_id": release.get("id")})
-                    
-                    # 5. Artist Credits
-                    for credited in recording.get("artist-credit", []):
-                        if credited.get("artist"):
-                            relationship_batches["artist_recording_credited"].append({"artist_id": credited["artist"].get("id"), "recording_id": rec_id, "subtype": "credited"})
+            # 3. Adicionar Recordings e relações
+            for media_index, media in enumerate(dict_.get("media", [])):
+                for track_index, track in enumerate(media.get("tracks", [])):
+                    recording = track.get("recording")
+                    if recording:
+                        rec_id = recording.get("id")
+                        entity_batches['recording'].append({"id": rec_id, "title": recording.get("title")})
+                        relationship_batches["recording_release_contained"].append({
+                            "recording_id": rec_id, 
+                            "release_id": release_id,
+                            "media_index": media_index, 
+                            "media_id": media["id"], 
+                            "track_index": track_index,
+                            "track_id": track["id"]
+                        })
+                        
+                        # 4. Relações da recording com Work, recording e release group dentro das propriedades do recording
+                        for rel in recording.get("relations", []):
+                            if rel.get("target-type") == "work":
+                                work = rel.get("work")
+                                if work:
+                                    relationship_batches["recording_work_performance"].append({
+                                        "work_id": work.get("id"),
+                                        "recording_id": rec_id,
+                                        "start_date": normalize_date(rel.get("begin")),
+                                        "end_date": normalize_date(rel.get("end")),
+                                    })
+                            elif rel.get("target-type") == "recording" and rel.get("type") == "samples material" and rel.get("direction") == "forward": #samples material redundante
+                                recording_2 = rel.get("recording")
+                                if recording_2:
+                                    relationship_batches["recording_recording_sample"].append({"recording_id": recording.get("id"), "recording_2_id": recording_2.get("id")})
+                            elif rel.get("target-type") == "release" and rel.get("type") == "samples material": #samples material redundante
+                                release = rel.get("release")
+                                if release:
+                                    relationship_batches["recording_release_sample"].append({"recording_id": recording.get("id"), "release_id": release.get("id")})
+                        
+                        # 5. Artist Credits
+                        for credited in recording.get("artist-credit", []):
+                            if credited.get("artist"):
+                                relationship_batches["artist_recording_credited"].append({"artist_id": credited["artist"].get("id"), "recording_id": rec_id, "subtype": "credited"})
 
-        flush_batches(session)
-    flush_batches(session, force=True)
+            flush_batches(session)
+        flush_batches(session, force=True)
 
     # --- 5.5 GRAVAÇÕES EXTRAS (Tratando as órfãs) ---
-    print("Processando Gravações Órfãs do arquivo de Recordings...")
-    for index, dict_ in tqdm(iter_in_file("dumps/recording.tar.xz", "mbdump/recording"), total=133144):
-        rec_id = dict_.get("id")
-        entity_batches['recording'].append({"id": rec_id, "title": dict_.get("title")})
-        
-        for rel in dict_.get("relations", []):
-            if rel.get("target-type") == "work":
-                work = rel.get("work")
-                if work:
-                    relationship_batches["recording_work_performance"].append({"work_id": work.get("id"), "recording_id": rec_id})
-            elif rel.get("target-type") == "recording" and rel.get("type") == "samples material" and rel.get("direction") == "forward":
-                recording_2 = rel.get("recording")
-                if recording_2:
-                    relationship_batches["recording_recording_sample"].append({"recording_id": recording.get("id"), "recording_2_id": recording_2.get("id")})
-            elif rel.get("target-type") == "release" and rel.get("type") == "samples material":
-                release = rel.get("release")
-                if release:
-                    relationship_batches["recording_release_sample"].append({"recording_id": recording.get("id"), "release_id": release.get("id")})
-
-
-        flush_batches(session)
-    flush_batches(session, force=True)
-
-# --- 5.6 RELAÇÕES ENTRE ARTISTAS E TUDO ---
-    print("Processando Artistas...")
-    
-    for index, dict_ in tqdm(iter_in_file("dumps/artist.tar.xz", "mbdump/artist"), total=2875751):
-        artist_relationships = {
-            "artist": defaultdict(list),
-            "recording": defaultdict(list),
-            "release": defaultdict(list),
-            "releasegroup": defaultdict(list),
-            "work": defaultdict(list),
-        }
-        for relation in dict_.get("relations", []):
-            target_type = relation.get("target-type")
-            rel_type = relation.get("type")
-            counterpart = relation.get(target_type)
-            if target_type in entities and counterpart and (target_type != "artist" or relation.get("direction") == "forward"):
-                artist_relationships[target_type][counterpart.get("id")].append(rel_type)
-
-            # if target_type == "artist" and relation.get("direction") == "forward":
-            #     relationship_batches["artist_artist_generic"].append({"artist_1_id": dict_.get("id"), "artist_2_id": relation.get("artist", {}).get("id"), "subtype": rel_type})
+    if args.step in ["all", "orphan-recordings"]:
+        print("Processando Gravações Órfãs do arquivo de Recordings...")
+        for index, dict_ in tqdm(iter_in_file("dumps/recording.tar.xz", "mbdump/recording"), total=133144):
+            rec_id = dict_.get("id")
+            entity_batches['recording'].append({"id": rec_id, "title": dict_.get("title")})
             
-            # elif target_type == "recording":
-            #     relationship_batches["artist_recording_generic"].append({"artist_id": dict_.get("id"), "recording_id": relation.get("recording", {}).get("id"), "subtype": rel_type})
+            for rel in dict_.get("relations", []):
+                if rel.get("target-type") == "work":
+                    work = rel.get("work")
+                    if work:
+                        relationship_batches["recording_work_performance"].append({
+                            "work_id": work.get("id"),
+                            "recording_id": rec_id,
+                            "start_date": normalize_date(rel.get("begin")),
+                            "end_date": normalize_date(rel.get("end")),
+                        })
+                elif rel.get("target-type") == "recording" and rel.get("type") == "samples material" and rel.get("direction") == "forward":
+                    recording_2 = rel.get("recording")
+                    if recording_2:
+                        relationship_batches["recording_recording_sample"].append({"recording_id": recording.get("id"), "recording_2_id": recording_2.get("id")})
+                elif rel.get("target-type") == "release" and rel.get("type") == "samples material":
+                    release = rel.get("release")
+                    if release:
+                        relationship_batches["recording_release_sample"].append({"recording_id": recording.get("id"), "release_id": release.get("id")})
 
-            # elif target_type == "release":
-            #     relationship_batches["artist_release_generic"].append({"artist_id": dict_.get("id"), "release_id": relation.get("release", {}).get("id"), "subtype": rel_type})
+            flush_batches(session)
+        flush_batches(session, force=True)
 
-            # elif target_type == "release-group":
-            #     relationship_batches["artist_releasegroup_generic"].append({"artist_id": dict_.get("id"), "release_group_id": relation.get("release-group", {}).get("id"), "subtype": rel_type})
-
-            # elif target_type == "work":
-            #     relationship_batches["artist_work_generic"].append({"artist_id": dict_.get("id"), "work_id": relation.get("work", {}).get("id"), "subtype": rel_type})
+    # --- 5.6 RELAÇÕES ENTRE ARTISTAS E TUDO ---
+    if args.step in ["all", "relations"]:
+        print("Processando Relações de Artistas...")
         
-        for entity, counterparts in artist_relationships.items():
-            for counterpart_id, subtypes in counterparts.items():
-                if entity == "artist":
-                    relationship_batches[f"artist_{entity}_generic"].append({"artist_1_id": dict_.get("id"), "artist_2_id": counterpart_id, "subtypes": subtypes})
-                else:
-                    relationship_batches[f"artist_{entity}_generic"].append({"artist_id": dict_.get("id"), f"{entity}_id": counterpart_id, "subtypes": subtypes})
+        for index, dict_ in tqdm(iter_in_file("dumps/artist.tar.xz", "mbdump/artist"), total=2875751):
+            artist_relationships = {
+                "artist": defaultdict(list),
+                "recording": defaultdict(list),
+                "release": defaultdict(list),
+                "releasegroup": defaultdict(list),
+                "work": defaultdict(list),
+            }
+            for relation in dict_.get("relations", []):
+                target_type = relation.get("target-type")
+                rel_type = relation.get("type")
+                counterpart = relation.get(target_type)
+                if target_type in entities and counterpart and (target_type != "artist" or relation.get("direction") == "forward"):
+                    if target_type == "artist":
+                        artist_relationships["artist"][counterpart.get("id")].append({
+                            "type": rel_type,
+                            "begin": normalize_date(relation.get("begin")),
+                            "end": normalize_date(relation.get("end")),
+                        })
+                    else:
+                        artist_relationships[target_type][counterpart.get("id")].append(rel_type)
 
-        flush_batches(session)
-    flush_batches(session, force=True) # Esvazia sobras
+            for counterpart_id, rel_data_list in artist_relationships["artist"].items():
+                subtypes = list({r["type"] for r in rel_data_list if r.get("type")})
+                valid_begins = [r["begin"] for r in rel_data_list if r.get("begin") is not None]
+                valid_ends = [r["end"] for r in rel_data_list if r.get("end") is not None]
+                start_date = min(valid_begins) if valid_begins else None
+                end_date = max(valid_ends) if valid_ends else None
+
+                relationship_batches["artist_artist_generic"].append({
+                    "artist_1_id": dict_.get("id"),
+                    "artist_2_id": counterpart_id,
+                    "subtypes": subtypes,
+                    "start_date": start_date,
+                    "end_date": end_date,
+                })
+
+            for entity in ["recording", "release", "releasegroup", "work"]:
+                for counterpart_id, subtypes in artist_relationships[entity].items():
+                    relationship_batches[f"artist_{entity}_generic"].append({
+                        "artist_id": dict_.get("id"),
+                        f"{entity}_id": counterpart_id,
+                        "subtypes": subtypes,
+                    })
+
+            flush_batches(session)
+        flush_batches(session, force=True) # Esvazia sobras
 
 print("Importação base do Neo4j finalizada com sucesso!")

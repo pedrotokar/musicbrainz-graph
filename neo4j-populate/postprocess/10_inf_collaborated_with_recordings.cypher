@@ -6,9 +6,9 @@ MATCH (a:Artist)
 CALL (a) {
     MATCH (a)-[:CREDITED_IN]->(rec:Recording)<-[:CREDITED_IN]-(b:Artist)
     WHERE a.id < b.id
-    MATCH (rec)-[:IS_CONTAINED_ON]->(rel:Release)
-    WITH a, b, rec, MIN(rel.release_date) AS first_recording_release_date
-    WITH a, b, COLLECT(DISTINCT [rec.id, rec.title]) AS collaboration_recordings, MIN(first_recording_release_date) AS first_collaboration_date
+    OPTIONAL MATCH (rec)-[:IS_CONTAINED_ON]->(rel:Release)
+    WITH a, b, rec, MIN(coalesce(rec.performance_date, rel.release_date)) AS first_recording_date
+    WITH a, b, COLLECT(DISTINCT [rec.id, rec.title]) AS collaboration_recordings, MIN(first_recording_date) AS first_collaboration_date
     MERGE (a)-[r:INF_COLLABORATED_WITH]->(b)
     SET r.collaboration_recordings = apoc.convert.toJson(collaboration_recordings),
         r.start_date = first_collaboration_date
